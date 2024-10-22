@@ -1,0 +1,18 @@
+/* Estilo para el campo de contraseña con el ícono dentro */
+.field {
+    position: relative;
+  }
+  
+  .toggle-password {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  }
+  
+  /* Opcional: ajustar el tamaño del ícono */
+  .toggle-password i {
+    font-size: 1.2em;
+    color: #333;
+  }
