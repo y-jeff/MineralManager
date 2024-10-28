@@ -1,0 +1,42 @@
+/* General font styling */
+body, h4, p, .navbar-brand, .btn {
+    font-family: 'Roboto', sans-serif;
+}
+/* Card styling */
+.card {
+    max-width: 500px;
+    margin: 20px auto;
+    font-size: 1rem;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+.card-header {
+    font-weight: 700;
+    font-size: 1.5rem;
+}
+/* Drop box styling */
+.drop_box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+}
+.drop_box h4 {
+    font-size: 1.2rem;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+.drop_box p {
+    font-size: 0.95rem;
+    color: #666;
+    margin-bottom: 15px;
+}
+.btn-primary {
+    width: 100%;
+    font-size: 1rem;
+    font-weight: 500;
+}

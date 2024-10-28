@@ -19,17 +19,26 @@ from django.urls import path
 from MineralApp import views
 from django.contrib.auth import views as auth_views
 
+
+from django.contrib import admin
+from django.urls import path
+from MineralApp import views
+from django.contrib.auth import views as auth_views
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', views.login_signup_view, name='login_signup'),  # Una sola URL para ambas acciones
+    path('', views.login_signup_view, name='login_signup'),  # Página de inicio para login y registro
     path('pending_approval/', views.pending_approval_view, name='pending_approval'),  # Página de espera para aprobación
     path('logout/', auth_views.LogoutView.as_view(next_page='login_signup'), name='logout'),
     path('home/', views.index, name='home'),  # Página principal después de iniciar sesión
-    path('update-file', views.update_file, name='update_file'), #Subir archivo
-    #Cambio de contraseña.
+
+    # Subida de archivo
+    path('upload/', views.upload_file, name='upload_file'),  # Subir archivo
+    path('upload/success/', views.upload_success, name='upload_success'),  # Vista de éxito después de la subida
+
+    # Cambio de contraseña
     path('password_reset/', auth_views.PasswordResetView.as_view(template_name='password_reset_form.html'), name='password_reset'),
     path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(template_name='password_reset_done.html'), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='password_reset_confirm.html'), name='password_reset_confirm'),
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(template_name='password_reset_complete.html'), name='password_reset_complete'),
-    
 ]

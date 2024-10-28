@@ -18,6 +18,7 @@
             crossorigin="anonymous"
         />
         <link href="{% static 'CSS/index_style.css' %}" rel="stylesheet" />
+        <link href="{% static 'CSS/logout_style.css' %}" rel="stylesheet" />
     </head>
 
     <body>
@@ -43,7 +44,7 @@
                     <a class="nav-item nav-link" href="#">Area</a>
                     <a class="nav-item nav-link" href="#">Inventario</a>
                     <a class="nav-item nav-link" href="#">Bodega</a>
-                    <a class="nav-item nav-link" href="/update-file">Subir Archivo</a>
+                    <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
                   </div>
 
                   <!-- Right navigation -->
@@ -142,17 +143,5 @@
             });
         </script>
 
-        <!-- Boton perzonalizado de cerrar sesion -->
-        <style>
-          .logout-button {
-            color: red;
-            transition: background-color 0.3s ease, color 0.3s ease;
-          }
-        
-          .logout-button:hover {
-            background-color: red;
-            color: white;
-          }
-        </style>
     </body>
 </html>
