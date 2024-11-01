@@ -17,28 +17,36 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from MineralApp import views
+from django.shortcuts import redirect
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth import views as auth_views
 
+# Definir la función para verificar si el usuario es superusuario
+def is_superuser(user):
+    return user.is_authenticated and user.is_superuser
 
-from django.contrib import admin
-from django.urls import path
-from MineralApp import views
-from django.contrib.auth import views as auth_views
+# Redirigir a una vista de "Acceso Denegado" si no es superusuario
+def access_denied(request):
+    return redirect('login_signup')  # Cambia 'login_signup' a otra vista si prefieres otra redirección
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', views.login_signup_view, name='login_signup'),  # Página de inicio para login y registro
-    path('pending_approval/', views.pending_approval_view, name='pending_approval'),  # Página de espera para aprobación
+    path('admin/', user_passes_test(is_superuser, login_url='access_denied')(admin.site.urls)),
+    path('', views.login_signup_view, name='login_signup'),
+    path('pending_approval/', views.pending_approval_view, name='pending_approval'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login_signup'), name='logout'),
-    path('home/', views.index, name='home'),  # Página principal después de iniciar sesión
+    path('home/', views.index, name='home'),
 
     # Subida de archivo
-    path('upload/', views.upload_file, name='upload_file'),  # Subir archivo
-    path('upload/success/', views.upload_success, name='upload_success'),  # Vista de éxito después de la subida
+    path('upload/', views.upload_file, name='upload_file'),
+    path('upload/success/', views.upload_success, name='upload_success'),
+
 
     # Cambio de contraseña
     path('password_reset/', auth_views.PasswordResetView.as_view(template_name='password_reset_form.html'), name='password_reset'),
     path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(template_name='password_reset_done.html'), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(template_name='password_reset_confirm.html'), name='password_reset_confirm'),
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(template_name='password_reset_complete.html'), name='password_reset_complete'),
+
+    # Vista de "Acceso Denegado"
+    path('access_denied/', access_denied, name='access_denied'),
 ]

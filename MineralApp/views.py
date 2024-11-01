@@ -36,7 +36,11 @@ def login_signup_view(request):
                 if user.is_approved:
                     if user.email_confirmed or not settings.EMAIL_CONFIRMATION_REQUIRED:
                         login(request, user)
-                        return redirect('home')
+                        # Redirigir al admin o al home según el tipo de usuario
+                        if user.is_superuser:
+                            return redirect('/admin/')  # Redirige al área de admin
+                        else:
+                            return redirect('home')  # Redirige al área de usuario regular
                     else:
                         return render(request, 'login.html', {'error': 'Su cuenta no ha sido confirmada.'})
                 else:
@@ -45,6 +49,7 @@ def login_signup_view(request):
                 return render(request, 'login.html', {'error': 'Nombre de usuario o contraseña incorrectos.'})
 
     return render(request, 'login.html')
+
 
 def pending_approval_view(request):
     return render(request, 'pending_approval.html')
@@ -58,6 +63,11 @@ def handle_uploaded_file(f):
         for chunk in f.chunks():
             destination.write(chunk)
     return file_path
+
+
+def redirect_to_home(request):
+    return redirect('/')  # Redirige a la página de inicio
+
 
 # Vista para manejar el formulario de carga de archivos y procesar el archivo
 @login_required
