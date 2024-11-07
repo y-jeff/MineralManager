@@ -30,16 +30,14 @@ def access_denied(request):
     return redirect('login_signup')  # Cambia 'login_signup' a otra vista si prefieres otra redirección
 
 urlpatterns = [
-    path('admin/', user_passes_test(is_superuser, login_url='access_denied')(admin.site.urls)),
+    path('admin/', admin.site.urls),
     path('', views.login_signup_view, name='login_signup'),
-    path('pending_approval/', views.pending_approval_view, name='pending_approval'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login_signup'), name='logout'),
     path('home/', views.index, name='home'),
 
     # Subida de archivo
-    path('upload/', views.upload_file, name='upload_file'),
+    path('upload/', views.upload_csv, name='upload_file'),
     path('upload/success/', views.upload_success, name='upload_success'),
-
 
     # Cambio de contraseña
     path('password_reset/', auth_views.PasswordResetView.as_view(template_name='password_reset_form.html'), name='password_reset'),

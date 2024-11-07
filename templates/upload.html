@@ -75,17 +75,19 @@
                     <form method="POST" enctype="multipart/form-data">
                         {% csrf_token %}
                         <div class="drop_box mb-3">
-                            <h4>Selecciona el Archivo aquí</h4>
-                            <p>Archivos Soportados: XLSX, XLSM, XLSB</p>
-                            <input type="file" name="file" accept=".xlsx,.xlsm,.xlsb" required>
+                            <label for="formFileMultiple" class="form-label">Seleccione los archivos CSV para subir:</label>
+                            <input type="file" name="file" accept=".csv" multiple required>
                         </div>
+                        <br>
+                        <br>
+                        <br>
                         <button type="submit" class="btn btn-primary">Subir Archivo</button>
                     </form>
                 </div>
             </div>
         </div>
     </main>
-    
+
     <footer>
         <!-- Footer content here -->
     </footer>
