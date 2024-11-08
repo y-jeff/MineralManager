@@ -9,14 +9,19 @@ from .models import (
     Capacitacion, CapacitacionTrabajador, Panol, Bodega,
     ArticuloPanol, ArticuloBodega, Maquinaria, MantenimientoMaquinaria, MovimientoArticulo
 )
-from datetime import datetime
+from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from .forms import ArticuloBodegaForm, ArticuloPanolForm
 from django.contrib import messages
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas
 from io import BytesIO
+from datetime import timedelta
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+
 
 # Vista para inicio de sesión
 def login_signup_view(request):
@@ -185,4 +190,157 @@ def descargar_informe(request):
     buffer.seek(0)
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="informe_articulos_bajos.pdf"'
+    return response
+
+# Vista de Trabajadores
+
+@login_required
+def trabajadores_view(request):
+    trabajadores = Trabajador.objects.all()
+    cargos = Cargo.objects.all()
+    areas = Area.objects.all()
+    certificaciones = Capacitacion.objects.all()
+
+    # Certificaciones próximas a expirar (en 30 días)
+    expiring_certifications = CapacitacionTrabajador.objects.filter(fecha_fin__lte=timezone.now() + timedelta(days=30))
+
+    # Procesar la creación de un trabajador
+    if request.method == 'POST' and 'crear' in request.POST:
+        rut = request.POST['rut']
+        nombre_trabajador = request.POST['nombre_trabajador']
+        cargo_id = request.POST['puesto_trabajo']
+        area_id = request.POST['area']
+        trabajador = Trabajador.objects.create(
+            rut=rut,
+            nombre_trabajador=nombre_trabajador,
+            cargo_id=cargo_id,
+            area_id=area_id
+        )
+
+        # Agregar certificaciones
+        for key, value in request.POST.items():
+            if 'certificaciones' in key and '[id]' in key:
+                cert_id = value
+                fecha_inicio = request.POST.get(f'certificaciones[{key.split("[")[1]}][fecha_inicio]')
+                fecha_fin = request.POST.get(f'certificaciones[{key.split("[")[1]}][fecha_fin]')
+                CapacitacionTrabajador.objects.create(
+                    trabajador=trabajador,
+                    capacitacion_id=cert_id,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin
+                )
+
+        messages.success(request, "Trabajador agregado exitosamente.")
+        return redirect('trabajadores')
+
+    # Procesar la edición de un trabajador
+    if 'editar_id' in request.GET:
+        trabajador = get_object_or_404(Trabajador, rut=request.GET['editar_id'])
+
+        if request.method == 'POST' and 'editar' in request.POST:
+            trabajador.nombre_trabajador = request.POST['nombre_trabajador']
+            trabajador.cargo_id = request.POST['puesto_trabajo']
+            trabajador.area_id = request.POST['area']
+            trabajador.save()
+
+            # Eliminar certificaciones existentes
+            CapacitacionTrabajador.objects.filter(trabajador=trabajador).delete()
+
+            # Agregar nuevas certificaciones
+            for key, value in request.POST.items():
+                if 'certificaciones' in key and '[id]' in key:
+                    cert_id = value
+                    fecha_inicio = request.POST.get(f'certificaciones[{key.split("[")[1]}][fecha_inicio]')
+                    fecha_fin = request.POST.get(f'certificaciones[{key.split("[")[1]}][fecha_fin]')
+                    CapacitacionTrabajador.objects.create(
+                        trabajador=trabajador,
+                        capacitacion_id=cert_id,
+                        fecha_inicio=fecha_inicio,
+                        fecha_fin=fecha_fin
+                    )
+
+            messages.success(request, "Trabajador editado exitosamente.")
+            return redirect('trabajadores')
+
+    # Procesar la eliminación de un trabajador
+    if 'eliminar_id' in request.GET:
+        trabajador = get_object_or_404(Trabajador, rut=request.GET['eliminar_id'])
+        trabajador.delete()
+        messages.success(request, "Trabajador eliminado exitosamente.")
+        return redirect('trabajadores')
+
+    context = {
+        'trabajadores': trabajadores,
+        'cargos': cargos,
+        'areas': areas,
+        'certificaciones': certificaciones,
+        'expiring_certifications': expiring_certifications.exists(),
+    }
+
+    return render(request, 'trabajadores.html', context)
+
+
+#Descargar Informe de Trabajadores
+
+
+@login_required
+def descargar_informe_trabajadores(request):
+    # Filtrar certificaciones próximas a expirar
+    fecha_limite = timezone.now() + timedelta(days=30)
+    trabajadores = Trabajador.objects.filter(
+        capacitaciontrabajador__fecha_fin__lte=fecha_limite
+    ).distinct()
+
+    # Configuración del PDF en orientación horizontal
+    buffer = BytesIO()
+    pdf = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+    elements = []
+
+    # Encabezado de la tabla
+    data = [
+        ["Rut", "Nombre Completo", "Puesto de Trabajo", "Área", "Certificación", "Fecha de Expiración"]
+    ]
+
+    # Estilo de la tabla con mayor espacio entre celdas
+    table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 1), (-1, -1), 8),  # Aumenta espacio superior
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 8),  # Aumenta espacio inferior
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),  # Aumenta espacio izquierdo
+        ('RIGHTPADDING', (0, 0), (-1, -1), 12),  # Aumenta espacio derecho
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ])
+
+    # Agregar datos de cada trabajador y certificaciones
+    for trabajador in trabajadores:
+        certificaciones = CapacitacionTrabajador.objects.filter(
+            trabajador=trabajador,
+            fecha_fin__lte=fecha_limite
+        )
+        for cert in certificaciones:
+            data.append([
+                trabajador.rut,
+                trabajador.nombre_trabajador,
+                trabajador.cargo.nombre_cargo,
+                trabajador.area.nombre_area,
+                cert.capacitacion.nombre_capacitacion,
+                cert.fecha_fin.strftime("%d-%m-%Y")
+            ])
+
+    # Creación de la tabla con colWidths para ajustar el ancho total de la página
+    table = Table(data, colWidths=[1.5*inch, 2*inch, 2*inch, 1.5*inch, 2*inch, 1.5*inch])
+    table.setStyle(table_style)
+    elements.append(table)
+
+    # Construcción del PDF
+    pdf.build(elements)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="informe_certificaciones_prontas_a_expirar.pdf"'
     return response

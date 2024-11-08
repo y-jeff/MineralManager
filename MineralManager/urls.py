@@ -52,5 +52,8 @@ urlpatterns = [
     path('pañol/', views.panol_view, name='pañol'),
     path('panol/descargar_informe/', views.descargar_informe, name='descargar_informe'),
 
+    #Vista de Trabajadores
+    path('trabajadores/', views.trabajadores_view, name='trabajadores'),
+     path('trabajadores/descargar_informe/', views.descargar_informe_trabajadores, name='descargar_informe_trabajadores'),
     
 ]
