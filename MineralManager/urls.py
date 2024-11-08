@@ -47,4 +47,10 @@ urlpatterns = [
 
     # Vista de "Acceso Denegado"
     path('access_denied/', access_denied, name='access_denied'),
+
+    # Vistas de inventario
+    path('pañol/', views.panol_view, name='pañol'),
+    path('panol/descargar_informe/', views.descargar_informe, name='descargar_informe'),
+
+    
 ]

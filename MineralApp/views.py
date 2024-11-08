@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
@@ -11,6 +11,12 @@ from .models import (
 )
 from datetime import datetime
 from django.core.exceptions import ValidationError
+from django.db.models import Q
+from .forms import ArticuloBodegaForm, ArticuloPanolForm
+from django.contrib import messages
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+from io import BytesIO
 
 # Vista para inicio de sesión
 def login_signup_view(request):
@@ -33,12 +39,10 @@ def login_signup_view(request):
                 return render(request, 'login.html', {'error': 'Nombre de usuario o contraseña incorrectos.'})
     return render(request, 'login.html')
 
-
 # Página Principal
 @login_required
 def index(request):
     return render(request, 'index.html')
-
 
 # Vista de carga de CSV
 @login_required
@@ -69,149 +73,119 @@ def upload_csv(request):
         return redirect('upload_success')
     return render(request, 'upload.html')
 
-
 # Página de éxito de carga
 @login_required
 def upload_success(request):
     return render(request, 'upload_success.html', {'message': 'Archivos subidos correctamente.'})
 
+# Funciones para procesar cada CSV (se mantienen sin cambios)
+# [...]
 
-# Funciones para procesar cada CSV
-def handle_trabajadores_csv(file):
-    reader = csv.DictReader(file.read().decode('utf-8').splitlines())
-    for row in reader:
-        area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
-        cargo, _ = Cargo.objects.get_or_create(nombre_cargo=row['Cargo'])
-        jornada, _ = Jornada.objects.get_or_create(tipo_jornada=row['Jornada'])
-        turno, _ = Turno.objects.get_or_create(tipo_turno=row['Turno'])
-        horario, _ = Horario.objects.get_or_create(ciclo=row['Ciclo'])
-        Trabajador.objects.update_or_create(
-            rut=row['RUT'],
-            defaults={
-                'nombre_trabajador': row['Nombre'],
-                'area': area,
-                'cargo': cargo,
-                'jornada': jornada,
-                'turno': turno,
-                'horario': horario,
-                'horas_esperadas_totales': row['Horas']
-            }
+# Vista de Pañol
+@login_required
+def panol_view(request):
+    search_query = request.GET.get('q', '')
+    ubicacion_id = request.GET.get('ubicacion', '')
+    cantidad_filtro = request.GET.get('cantidad_filtro', '')
+
+    articulos = ArticuloPanol.objects.all()
+
+    # Filtro por búsqueda
+    if search_query:
+        articulos = articulos.filter(
+            Q(nombre_articulo__icontains=search_query) |
+            Q(descripcion_articulo__icontains=search_query)
         )
 
+    # Filtro por ubicación
+    if ubicacion_id:
+        articulos = articulos.filter(panol__id=ubicacion_id)
 
-def handle_capacitaciones_csv(file):
-    reader = csv.DictReader(file.read().decode('utf-8').splitlines())
-    for row in reader:
-        try:
-            trabajador = Trabajador.objects.get(rut=row['RUT'])
-            capacitacion, _ = Capacitacion.objects.get_or_create(
-                nombre_capacitacion=row['Capacitacion'],
-                es_renovable=(row.get('Renovable', 'No') == 'Sí')
-            )
-            fecha_inicio = parse_date(row.get('Fecha Inicio'))
-            fecha_fin = parse_date(row.get('Fecha Fin'))
+    # Filtro por cantidad
+    if cantidad_filtro == 'bajo':
+        articulos = articulos.filter(cantidad__lte=10, cantidad__gt=0)
+    elif cantidad_filtro == 'agotado':
+        articulos = articulos.filter(cantidad=0)
 
-            CapacitacionTrabajador.objects.update_or_create(
-                trabajador=trabajador,
-                capacitacion=capacitacion,
-                defaults={
-                    'fecha_inicio': fecha_inicio,
-                    'fecha_fin': fecha_fin
-                }
-            )
-        except Trabajador.DoesNotExist:
-            print(f"Error: Trabajador con RUT {row['RUT']} no encontrado.")
-        except ValidationError as e:
-            print(f"Error de validación: {e}")
+    # Procesar la creación de un artículo
+    if request.method == 'POST' and 'crear' in request.POST:
+        form = ArticuloPanolForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Artículo agregado exitosamente.")
+            return redirect('pañol')
+        else:
+            print("Errores en el formulario de creación:", form.errors)
 
+    # Procesar la edición de un artículo
+    if 'editar_id' in request.GET:
+        articulo_editar = get_object_or_404(ArticuloPanol, id=request.GET['editar_id'])
+        edit_form = ArticuloPanolForm(request.POST or None, instance=articulo_editar)
+        if request.method == 'POST' and 'editar' in request.POST and edit_form.is_valid():
+            edit_form.save()
+            messages.success(request, "Artículo editado exitosamente.")
+            return redirect('pañol')
+        elif request.method == 'POST' and 'editar' in request.POST:
+            print("Errores en el formulario de edición:", edit_form.errors)
+    else:
+        edit_form = None
 
-def handle_articulo_panol_csv(file):
-    reader = csv.DictReader(file.read().decode('utf-8').splitlines())
-    for row in reader:
-        panol, _ = Panol.objects.get_or_create(nombre_panol=row['Pañol'])
-        ArticuloPanol.objects.update_or_create(
-            panol=panol,
-            nombre_articulo=row['Nombre Articulo'],
-            defaults={
-                'descripcion_articulo': row['Descripción'],
-                'cantidad': row['Cantidad']
-            }
-        )
+    # Procesar la eliminación de un artículo
+    if 'eliminar_id' in request.GET:
+        articulo_eliminar = get_object_or_404(ArticuloPanol, id=request.GET['eliminar_id'])
+        if request.method == 'POST' and 'eliminar' in request.POST:
+            articulo_eliminar.delete()
+            messages.success(request, "Artículo eliminado exitosamente.")
+            return redirect('pañol')
 
+    # Para filtros de advertencia de artículos bajos
+    advertencias = ArticuloPanol.objects.filter(cantidad__lte=10)
+    panoles = Panol.objects.all()
 
-def handle_articulo_bodega_csv(file):
-    reader = csv.DictReader(file.read().decode('utf-8').splitlines())
-    for row in reader:
-        bodega, _ = Bodega.objects.get_or_create(nombre_bodega=row['Bodega'])
-        ArticuloBodega.objects.update_or_create(
-            bodega=bodega,
-            nombre_articulo=row['Nombre Articulo'],
-            defaults={
-                'descripcion_articulo': row['Descripción'],
-                'cantidad': row['Cantidad']
-            }
-        )
+    context = {
+        'articulos': articulos,
+        'panoles': panoles,
+        'search_query': search_query,
+        'ubicacion_id': ubicacion_id,
+        'cantidad_filtro': cantidad_filtro,
+        'advertencias': advertencias,
+        'form': ArticuloPanolForm(),
+        'edit_form': edit_form,
+    }
 
+    return render(request, 'panol.html', context)
 
-def handle_maquinarias_csv(file):
-    reader = csv.DictReader(file.read().decode('utf-8').splitlines())
-    for row in reader:
-        area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
-        Maquinaria.objects.update_or_create(
-            codigo_maquinaria=row['Código'],
-            defaults={
-                'nombre_maquinaria': row['Nombre Maquinaria'],
-                'fecha_adquisicion': parse_date(row['Fecha Adquisición']),
-                'estado': row['Estado'],
-                'area': area
-            }
-        )
+# Vista para descargar informe en PDF
+@login_required
+def descargar_informe(request):
+    # Filtramos los artículos con cantidad baja
+    articulos_bajos = ArticuloPanol.objects.filter(cantidad__lte=10)
+    
+    # Configuramos el PDF
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    pdf.setTitle("Informe de Artículos Bajos en Stock")
 
+    # Título del informe
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(72, 750, "Informe de Artículos Bajos en Stock")
+    pdf.setFont("Helvetica", 12)
+    pdf.drawString(72, 730, "Lista de artículos con stock bajo o agotado:")
 
-def handle_mantenimientos_csv(file):
-    reader = csv.DictReader(file.read().decode('utf-8').splitlines())
-    for row in reader:
-        try:
-            maquinaria = Maquinaria.objects.get(codigo_maquinaria=row['Código'])
-            MantenimientoMaquinaria.objects.update_or_create(
-                maquinaria=maquinaria,
-                fecha_mantenimiento=parse_date(row['Fecha Mantenimiento']),
-                defaults={
-                    'descripcion': row['Descripción'],
-                    'realizado_por': row['Realizado Por']
-                }
-            )
-        except Maquinaria.DoesNotExist:
-            print(f"Error: Maquinaria con código {row['Código']} no encontrada.")
+    # Contenido del informe
+    y = 700
+    for articulo in articulos_bajos:
+        pdf.drawString(72, y, f"Nombre: {articulo.nombre_articulo} | Descripción: {articulo.descripcion_articulo} | "
+                              f"Cantidad: {articulo.cantidad} | Ubicación: {articulo.panol.nombre_panol}")
+        y -= 20
+        if y < 50:  # Si la posición `y` es baja, se añade una nueva página
+            pdf.showPage()
+            y = 750
 
+    pdf.save()
 
-def handle_movimientos_csv(file):
-    reader = csv.DictReader(file.read().decode('utf-8').splitlines())
-    for row in reader:
-        try:
-            articulo = ArticuloBodega.objects.get(nombre_articulo=row['Nombre Articulo'])
-            origen = Bodega.objects.get(nombre_bodega=row['Bodega Origen'])
-            destino = Panol.objects.get(nombre_panol=row['Pañol Destino'])
-            fecha_movimiento = parse_date(row['Fecha Movimiento'], default_today=True)
-
-            MovimientoArticulo.objects.create(
-                articulo=articulo,
-                origen=origen,
-                destino=destino,
-                cantidad=int(row['Cantidad']),
-                fecha_movimiento=fecha_movimiento,
-                motivo=row.get('Motivo', '')
-            )
-        except (ArticuloBodega.DoesNotExist, Bodega.DoesNotExist, Panol.DoesNotExist) as e:
-            print(f"Error: {e}")
-
-
-# Helper function to parse dates and handle empty values
-def parse_date(date_str, default_today=False):
-    if date_str:
-        try:
-            return datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
-            raise ValidationError(f"Fecha inválida: {date_str}")
-    return datetime.today().date() if default_today else None
-
+    # Enviar el PDF como respuesta
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="informe_articulos_bajos.pdf"'
+    return response

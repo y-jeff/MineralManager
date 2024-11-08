@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pañol - Mineral Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <link href="{% static 'CSS/index_style.css' %}" rel="stylesheet" />
+    <link href="{% static 'CSS/logout_style.css' %}" rel="stylesheet" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
+            <div class="container-xl">
+                <a class="navbar-brand" href="/home"><h4>Mineral Manager</h4></a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarCollapse">
+                    <div class="navbar-nav mx-lg-auto">
+                        <a class="nav-item nav-link" href="/home">Home</a>
+                        <a class="nav-item nav-link" href="#">Trabajadores</a>
+                        <a class="nav-item nav-link" href="#">Maquinaria</a>
+                        <a class="nav-item nav-link active" href="/pañol">Pañol</a>
+                        <a class="nav-item nav-link" href="#">Bodega</a>
+                        <a class="nav-item nav-link" href="#">Retiro de Artículo</a>
+                        <a class="nav-item nav-link" href="#">Bodega a Artículo</a>
+                        <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container mt-5">
+        <h1>Pañol</h1>
+
+        {% if advertencias %}
+        <div class="alert alert-warning">
+            <strong>Advertencia:</strong> Algunos artículos tienen cantidad baja o están agotados.
+            <ul>
+                {% for articulo in advertencias %}
+                    <li>{{ articulo.nombre_articulo }} ({{ articulo.cantidad }} en stock)</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- Filtros y búsqueda en una sola línea -->
+        <form method="GET" class="form-inline mb-3">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control" placeholder="Buscar artículo..." value="{{ search_query }}">
+                
+                <select class="form-select" name="ubicacion">
+                    <option value="">Todas las ubicaciones</option>
+                    {% for panol in panoles %}
+                        <option value="{{ panol.id }}" {% if panol.id|stringformat:"s" == ubicacion_id %}selected{% endif %}>{{ panol.nombre_panol }}</option>
+                    {% endfor %}
+                </select>
+                
+                <select class="form-select" name="cantidad_filtro">
+                    <option value="">Todos los artículos</option>
+                    <option value="bajo" {% if cantidad_filtro == 'bajo' %}selected{% endif %}>Bajo en stock</option>
+                    <option value="agotado" {% if cantidad_filtro == 'agotado' %}selected{% endif %}>Agotado</option>
+                </select>
+                
+                <button class="btn btn-primary" type="submit">Buscar</button>
+            </div>
+        </form>
+
+        <!-- Tabla de inventario -->
+        <table class="table table-bordered table-striped mt-3">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th>Cantidad</th>
+                    <th>Ubicación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for articulo in articulos %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ articulo.nombre_articulo }}</td>
+                    <td>{{ articulo.descripcion_articulo }}</td>
+                    <td>
+                        {% if articulo.cantidad > 10 %}
+                            <span class="badge bg-success">{{ articulo.cantidad }}</span>
+                        {% elif articulo.cantidad > 0 %}
+                            <span class="badge bg-warning">{{ articulo.cantidad }}</span>
+                        {% else %}
+                            <span class="badge bg-danger">Agotado</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ articulo.panol.nombre_panol|default:"No asignado" }}</td>
+                    <td>
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ articulo.id }}">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ articulo.id }}">
+                            <i class="fas fa-trash-alt"></i> Eliminar
+                        </button>
+                    </td>
+                </tr>
+
+                <!-- Modal para edición -->
+                <div class="modal fade" id="editModal{{ articulo.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST" action="?editar_id={{ articulo.id }}">
+                                {% csrf_token %}
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Editar artículo</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <input type="hidden" name="editar" value="1">
+                                    <div class="mb-3">
+                                        <label class="form-label">Nombre</label>
+                                        <input type="text" class="form-control" name="nombre_articulo" value="{{ articulo.nombre_articulo }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Descripción</label>
+                                        <input type="text" class="form-control" name="descripcion_articulo" value="{{ articulo.descripcion_articulo }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Cantidad</label>
+                                        <input type="number" class="form-control" name="cantidad" value="{{ articulo.cantidad }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Ubicación</label>
+                                        <select class="form-select" name="panol" required>
+                                            {% for panol in panoles %}
+                                                <option value="{{ panol.id }}" {% if panol.id == articulo.panol.id %}selected{% endif %}>{{ panol.nombre_panol }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                                </div>
+                            </form>                            
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal para eliminación -->
+                <div class="modal fade" id="deleteModal{{ articulo.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST" action="?eliminar_id={{ articulo.id }}">
+                                {% csrf_token %}
+                                <input type="hidden" name="eliminar" value="1">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Eliminar artículo</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>¿Estás seguro de que deseas eliminar el artículo "{{ articulo.nombre_articulo }}"?</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Botón para agregar nuevo artículo -->
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
+            <i class="fas fa-plus"></i> Agregar artículo
+        </button>
+        <!-- Botón para descargar el informe de artículos bajos en stock -->
+        <a href="{% url 'descargar_informe' %}" class="btn btn-info">Descargar Informe de Artículos</a>
+
+        <!-- Modal para agregar nuevo artículo -->
+        <div class="modal fade" id="addModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="?crear=1">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h5 class="modal-title">Agregar nuevo artículo</h5
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="nombre" class="form-label">Nombre</label>
+                                    <input type="text" class="form-control" name="nombre_articulo" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="descripcion" class="form-label">Descripción</label>
+                                    <input type="text" class="form-control" name="descripcion_articulo" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="cantidad" class="form-label">Cantidad</label>
+                                    <input type="number" class="form-control" name="cantidad" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Ubicación</label>
+                                    <select class="form-select" name="ubicacion" required>
+                                        <option value="">Selecciona una ubicación</option>
+                                        {% for panol in panoles %}
+                                            <option value="{{ panol.id }}">{{ panol.nombre_panol }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                <button type="submit" class="btn btn-success">Agregar artículo</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+    
+        </main>
+    
+        <!-- Bootstrap JavaScript Libraries -->
+        <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+    </body>
+    </html>
+    

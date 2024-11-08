@@ -5,7 +5,7 @@ body, html {
 }
 
 .login-page {
-    background-color: #dceefb; /* Fondo celeste pastel */
+    background: linear-gradient(135deg, #003366, #0066cc); /* Fondo degradado azul */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -15,11 +15,13 @@ body, html {
 .login-container {
     border-radius: 8px;
     overflow: hidden;
+    background-color: #ffffff;
+    box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.2); /* Sombra para resaltar el cuadro de login */
 }
 
 .login-container .col-md-6.logo-section {
-    background-color: #a2d5f2; /* Fondo pastel celeste más oscuro */
-    color: #fff;
+    background-color: #003366; /* Azul oscuro sólido para el logo */
+    color: #ffffff;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -37,22 +39,40 @@ body, html {
 }
 
 .btn-primary {
-    background-color: #5fa8d3;
-    border-color: #5fa8d3;
+    background-color: #007bff; /* Azul brillante para el botón */
+    border-color: #007bff;
+    color: #ffffff;
+    width: 100%;
+    font-weight: bold;
 }
 
 .btn-primary:hover {
-    background-color: #4e92bc;
-    border-color: #4e92bc;
+    background-color: #0056b3;
+    border-color: #0056b3;
 }
 
 .input-group-text {
-    background-color: #a2d5f2;
-    color: #fff;
+    background-color: #003366; /* Fondo azul oscuro para iconos */
+    color: #ffffff;
 }
 
 h3 {
-    color: #4e92bc;
+    color: #003366; /* Texto de color azul oscuro */
+    font-weight: bold;
+    margin-bottom: 1rem;
+}
+
+.input-group .form-control {
+    border-radius: 0;
+    border-color: #cccccc;
+}
+
+a {
+    color: #007bff; /* Azul para enlaces */
+}
+
+a:hover {
+    color: #0056b3;
 }
 
 @media (max-width: 768px) {
