@@ -109,24 +109,28 @@ def panol_view(request):
 
     # Procesar la creación de un artículo
     if request.method == 'POST' and 'crear' in request.POST:
-        form = ArticuloPanolForm(request.POST)
-        if form.is_valid():
-            form.save()
+        create_form = ArticuloPanolForm(request.POST)
+        if create_form.is_valid():
+            create_form.save()
             messages.success(request, "Artículo agregado exitosamente.")
             return redirect('pañol')
         else:
-            print("Errores en el formulario de creación:", form.errors)
+            print("Errores en el formulario de creación:", create_form.errors)
+    else:
+        create_form = ArticuloPanolForm()
 
     # Procesar la edición de un artículo
     if 'editar_id' in request.GET:
         articulo_editar = get_object_or_404(ArticuloPanol, id=request.GET['editar_id'])
         edit_form = ArticuloPanolForm(request.POST or None, instance=articulo_editar)
-        if request.method == 'POST' and 'editar' in request.POST and edit_form.is_valid():
-            edit_form.save()
-            messages.success(request, "Artículo editado exitosamente.")
-            return redirect('pañol')
-        elif request.method == 'POST' and 'editar' in request.POST:
-            print("Errores en el formulario de edición:", edit_form.errors)
+        
+        if request.method == 'POST' and 'editar' in request.POST:
+            if edit_form.is_valid():
+                edit_form.save()
+                messages.success(request, "Artículo editado exitosamente.")
+                return redirect('pañol')
+            else:
+                print("Errores en el formulario de edición:", edit_form.errors)
     else:
         edit_form = None
 
@@ -138,7 +142,6 @@ def panol_view(request):
             messages.success(request, "Artículo eliminado exitosamente.")
             return redirect('pañol')
 
-    # Para filtros de advertencia de artículos bajos
     advertencias = ArticuloPanol.objects.filter(cantidad__lte=10)
     panoles = Panol.objects.all()
 
@@ -149,42 +152,36 @@ def panol_view(request):
         'ubicacion_id': ubicacion_id,
         'cantidad_filtro': cantidad_filtro,
         'advertencias': advertencias,
-        'form': ArticuloPanolForm(),
+        'create_form': create_form,  # Formulario de creación separado
         'edit_form': edit_form,
     }
 
     return render(request, 'panol.html', context)
 
-# Vista para descargar informe en PDF
 @login_required
 def descargar_informe(request):
-    # Filtramos los artículos con cantidad baja
     articulos_bajos = ArticuloPanol.objects.filter(cantidad__lte=10)
     
-    # Configuramos el PDF
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
     pdf.setTitle("Informe de Artículos Bajos en Stock")
 
-    # Título del informe
     pdf.setFont("Helvetica-Bold", 16)
     pdf.drawString(72, 750, "Informe de Artículos Bajos en Stock")
     pdf.setFont("Helvetica", 12)
     pdf.drawString(72, 730, "Lista de artículos con stock bajo o agotado:")
 
-    # Contenido del informe
     y = 700
     for articulo in articulos_bajos:
         pdf.drawString(72, y, f"Nombre: {articulo.nombre_articulo} | Descripción: {articulo.descripcion_articulo} | "
                               f"Cantidad: {articulo.cantidad} | Ubicación: {articulo.panol.nombre_panol}")
         y -= 20
-        if y < 50:  # Si la posición `y` es baja, se añade una nueva página
+        if y < 50:
             pdf.showPage()
             y = 750
 
     pdf.save()
 
-    # Enviar el PDF como respuesta
     buffer.seek(0)
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="informe_articulos_bajos.pdf"'

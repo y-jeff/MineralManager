@@ -100,10 +100,10 @@
                     <td>{{ articulo.panol.nombre_panol|default:"No asignado" }}</td>
                     <td>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ articulo.id }}">
-                            <i class="fas fa-edit"></i> Editar
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: rgba(0, 0, 0, 1);transform: ;msFilter:;"><path d="m18.988 2.012 3 3L19.701 7.3l-3-3zM8 16h3l7.287-7.287-3-3L8 13z"></path><path d="M19 19H8.158c-.026 0-.053.01-.079.01-.033 0-.066-.009-.1-.01H5V5h6.847l2-2H5c-1.103 0-2 .896-2 2v14c0 1.104.897 2 2 2h14a2 2 0 0 0 2-2v-8.668l-2 2V19z"></path></svg>
                         </button>
                         <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ articulo.id }}">
-                            <i class="fas fa-trash-alt"></i> Eliminar
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: rgba(0, 0, 0, 1);transform: ;msFilter:;"><path d="M5 20a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8h2V6h-4V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H3v2h2zM9 4h6v2H9zM8 8h9v12H7V8z"></path><path d="M9 10h2v8H9zm4 0h2v8h-2z"></path></svg>
                         </button>
                     </td>
                 </tr>
@@ -183,48 +183,48 @@
         <!-- Botón para descargar el informe de artículos bajos en stock -->
         <a href="{% url 'descargar_informe' %}" class="btn btn-info">Descargar Informe de Artículos</a>
 
-        <!-- Modal para agregar nuevo artículo -->
+            <!-- Modal para agregar nuevo artículo -->
         <div class="modal fade" id="addModal" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <form method="POST" action="?crear=1">
                         {% csrf_token %}
                         <div class="modal-header">
-                            <h5 class="modal-title">Agregar nuevo artículo</h5
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            <h5 class="modal-title">Agregar nuevo artículo</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="nombre" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" name="nombre_articulo" required>
                             </div>
-                            <div class="modal-body">
-                                <div class="mb-3">
-                                    <label for="nombre" class="form-label">Nombre</label>
-                                    <input type="text" class="form-control" name="nombre_articulo" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="descripcion" class="form-label">Descripción</label>
-                                    <input type="text" class="form-control" name="descripcion_articulo" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="cantidad" class="form-label">Cantidad</label>
-                                    <input type="number" class="form-control" name="cantidad" required>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Ubicación</label>
-                                    <select class="form-select" name="ubicacion" required>
-                                        <option value="">Selecciona una ubicación</option>
-                                        {% for panol in panoles %}
-                                            <option value="{{ panol.id }}">{{ panol.nombre_panol }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
+                            <div class="mb-3">
+                                <label for="descripcion" class="form-label">Descripción</label>
+                                <input type="text" class="form-control" name="descripcion_articulo" required>
                             </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                                <button type="submit" class="btn btn-success">Agregar artículo</button>
+                            <div class="mb-3">
+                                <label for="cantidad" class="form-label">Cantidad</label>
+                                <input type="number" class="form-control" name="cantidad" required>
                             </div>
-                        </form>
-                    </div>
+                            <div class="mb-3">
+                                <label class="form-label">Ubicación</label>
+                                <select class="form-select" name="panol" required>
+                                    <option value="">Selecciona una ubicación</option>
+                                    {% for panol in panoles %}
+                                        <option value="{{ panol.id }}">{{ panol.nombre_panol }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                            <button type="submit" class="btn btn-success" name="crear">Agregar artículo</button>
+                        </div>
+                    </form>
                 </div>
             </div>
-    
+        </div>
+
         </main>
     
         <!-- Bootstrap JavaScript Libraries -->
