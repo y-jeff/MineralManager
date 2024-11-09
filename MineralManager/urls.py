@@ -55,5 +55,7 @@ urlpatterns = [
     #Vista de Trabajadores
     path('trabajadores/', views.trabajadores_view, name='trabajadores'),
      path('trabajadores/descargar_informe/', views.descargar_informe_trabajadores, name='descargar_informe_trabajadores'),
-    
+
+    # Vista de Bodega
+    path('bodega/', views.bodega_view, name='bodega'),
 ]

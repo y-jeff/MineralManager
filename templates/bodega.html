@@ -4,12 +4,13 @@
     {% load static %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pañol - Mineral Manager</title>
+    <title>Bodega - Mineral Manager</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
     <link href="{% static 'CSS/index_style.css' %}" rel="stylesheet" />
     <link href="{% static 'CSS/logout_style.css' %}" rel="stylesheet" />
 </head>
+
 <body>
     <header>
         <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
@@ -23,8 +24,8 @@
                         <a class="nav-item nav-link" href="/home">Home</a>
                         <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
                         <a class="nav-item nav-link" href="#">Maquinaria</a>
-                        <a class="nav-item nav-link active" href="/pañol">Pañol</a>
-                        <a class="nav-item nav-link" href="/bodega">Bodega</a>
+                        <a class="nav-item nav-link" href="/pañol">Pañol</a>
+                        <a class="nav-item nav-link active" href="/bodega">Bodega</a>
                         <a class="nav-item nav-link" href="#">Retiro de Artículo</a>
                         <a class="nav-item nav-link" href="#">Bodega a Artículo</a>
                         <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
@@ -33,43 +34,8 @@
             </div>
         </nav>
     </header>
-
     <main class="container mt-5">
-        <h1>Pañol</h1>
-
-        {% if advertencias %}
-        <div class="alert alert-warning">
-            <strong>Advertencia:</strong> Algunos artículos tienen cantidad baja o están agotados.
-            <ul>
-                {% for articulo in advertencias %}
-                    <li>{{ articulo.nombre_articulo }} ({{ articulo.cantidad }} en stock)</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-
-        <!-- Filtros y búsqueda en una sola línea -->
-        <form method="GET" class="form-inline mb-3">
-            <div class="input-group">
-                <input type="text" name="q" class="form-control" placeholder="Buscar artículo..." value="{{ search_query }}">
-                
-                <select class="form-select" name="ubicacion">
-                    <option value="">Todas las ubicaciones</option>
-                    {% for panol in panoles %}
-                        <option value="{{ panol.id }}" {% if panol.id|stringformat:"s" == ubicacion_id %}selected{% endif %}>{{ panol.nombre_panol }}</option>
-                    {% endfor %}
-                </select>
-                
-                <select class="form-select" name="cantidad_filtro">
-                    <option value="">Todos los artículos</option>
-                    <option value="bajo" {% if cantidad_filtro == 'bajo' %}selected{% endif %}>Bajo en stock</option>
-                    <option value="agotado" {% if cantidad_filtro == 'agotado' %}selected{% endif %}>Agotado</option>
-                </select>
-                
-                <button class="btn btn-primary" type="submit">Buscar</button>
-            </div>
-        </form>
-
+        <h1>Bodega</h1>
         <!-- Tabla de inventario -->
         <table class="table table-bordered table-striped mt-3">
             <thead class="table-dark">
@@ -80,6 +46,7 @@
                     <th>Cantidad</th>
                     <th>Ubicación</th>
                     <th>Acciones</th>
+                    <th>Disponibilidad</th>
                 </tr>
             </thead>
             <tbody>
@@ -97,7 +64,7 @@
                             <span class="badge bg-danger">Agotado</span>
                         {% endif %}
                     </td>
-                    <td>{{ articulo.panol.nombre_panol|default:"No asignado" }}</td>
+                    <td>{{ articulo.bodega.nombre_bodega|default:"No asignado" }}</td>
                     <td>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ articulo.id }}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: rgba(0, 0, 0, 1);transform: ;msFilter:;"><path d="m18.988 2.012 3 3L19.701 7.3l-3-3zM8 16h3l7.287-7.287-3-3L8 13z"></path><path d="M19 19H8.158c-.026 0-.053.01-.079.01-.033 0-.066-.009-.1-.01H5V5h6.847l2-2H5c-1.103 0-2 .896-2 2v14c0 1.104.897 2 2 2h14a2 2 0 0 0 2-2v-8.668l-2 2V19z"></path></svg>
@@ -135,8 +102,8 @@
                                     <div class="mb-3">
                                         <label class="form-label">Ubicación</label>
                                         <select class="form-select" name="panol" required>
-                                            {% for panol in panoles %}
-                                                <option value="{{ panol.id }}" {% if panol.id == articulo.panol.id %}selected{% endif %}>{{ panol.nombre_panol }}</option>
+                                            {% for bodega in bodegas %}
+                                                <option value="{{ bodega.id }}" {% if bodega.id == articulo.bodega.id %}selected{% endif %}>{{ bodega.nombre_bodega }}</option>
                                             {% endfor %}
                                         </select>
                                     </div>
@@ -180,9 +147,6 @@
         <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
             <i class="fas fa-plus"></i> Agregar artículo
         </button>
-        <!-- Botón para descargar el informe de artículos bajos en stock -->
-        <a href="{% url 'descargar_informe' %}" class="btn btn-info">Descargar Informe de Artículos</a>
-
             <!-- Modal para agregar nuevo artículo -->
         <div class="modal fade" id="addModal" tabindex="-1">
             <div class="modal-dialog">
@@ -210,11 +174,16 @@
                                 <label class="form-label">Ubicación</label>
                                 <select class="form-select" name="panol" required>
                                     <option value="">Selecciona una ubicación</option>
-                                    {% for panol in panoles %}
-                                        <option value="{{ panol.id }}">{{ panol.nombre_panol }}</option>
+                                    {% for bodega in bodegas %}
+                                        <option value="{{ panol.id }}">{{ bodega.nombre_bodega }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
+                            <h4>Verificar Disponibilidad</h4>
+                                 <input type="radio" id="si" name="disponibilidad" value="si" required>
+                                  <label for="si">Sí</label><br>
+                                <input type="radio" id="no" name="disponibilidad" value="no">
+                                <label for="no">No</label><br><br>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -226,10 +195,8 @@
         </div>
 
         </main>
-    
         <!-- Bootstrap JavaScript Libraries -->
         <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" crossorigin="anonymous"></script>
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
     </body>
     </html>
-    

@@ -21,6 +21,7 @@ from datetime import timedelta
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
+from .forms import ProductoForm #para disponibilidad (no funciona)
 
 
 # Vista para inicio de sesión
@@ -282,7 +283,6 @@ def trabajadores_view(request):
 
 #Descargar Informe de Trabajadores
 
-
 @login_required
 def descargar_informe_trabajadores(request):
     # Filtrar certificaciones próximas a expirar
@@ -344,3 +344,83 @@ def descargar_informe_trabajadores(request):
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="informe_certificaciones_prontas_a_expirar.pdf"'
     return response
+
+# Vista de bodega
+@login_required
+def bodega_view(request):
+    search_query = request.GET.get('q', '')
+    ubicacion_id = request.GET.get('ubicacion', '')
+    cantidad_filtro = request.GET.get('cantidad_filtro', '')
+
+    articulos = ArticuloBodega.objects.all()
+
+    # Filtro por ubicación
+    if ubicacion_id:
+        articulos = articulos.filter(bodegas__id=ubicacion_id)
+
+    # Filtro por cantidad
+    if cantidad_filtro == 'bajo':
+        articulos = articulos.filter(cantidad__lte=10, cantidad__gt=0)
+    elif cantidad_filtro == 'agotado':
+        articulos = articulos.filter(cantidad=0)
+    # Procesar la creación de un artículo
+    if request.method == 'POST' and 'crear' in request.POST:
+        create_form = ArticuloBodegaForm(request.POST)
+        if create_form.is_valid():
+            create_form.save()
+            messages.success(request, "Artículo agregado exitosamente.")
+            return redirect('bodega')
+        else:
+            print("Errores en el formulario de creación:", create_form.errors)
+    else:
+        create_form = ArticuloBodegaForm()
+
+    # Procesar la edición de un artículo
+    if 'editar_id' in request.GET:
+        articulo_editar = get_object_or_404(ArticuloBodega, id=request.GET['editar_id'])
+        edit_form = ArticuloBodegaForm(request.POST or None, instance=articulo_editar)
+        
+        if request.method == 'POST' and 'editar' in request.POST:
+            if edit_form.is_valid():
+                edit_form.save()
+                messages.success(request, "Artículo editado exitosamente.")
+                return redirect('bodega')
+            else:
+                print("Errores en el formulario de edición:", edit_form.errors)
+    else:
+        edit_form = None
+
+    # Procesar la eliminación de un artículo
+    if 'eliminar_id' in request.GET:
+        articulo_eliminar = get_object_or_404(ArticuloBodega, id=request.GET['eliminar_id'])
+        if request.method == 'POST' and 'eliminar' in request.POST:
+            articulo_eliminar.delete()
+            messages.success(request, "Artículo eliminado exitosamente.")
+            return redirect('bodega')
+
+    advertencias = ArticuloBodega.objects.filter(cantidad__lte=10)
+    bodegas = Bodega.objects.all()
+
+    context = {
+        'articulos': articulos,
+        'bodegas': bodegas,
+        'search_query': search_query,
+        'ubicacion_id': ubicacion_id,
+        'cantidad_filtro': cantidad_filtro,
+        'advertencias': advertencias,
+        'create_form': create_form,  # Formulario de creación separado
+        'edit_form': edit_form,
+    }
+
+    return render(request, 'bodega.html', context)
+    #bodega disponibilidad 
+def verificar_disponibilidad(request):
+    if request.method == 'POST':  
+        form = ProductoForm(request.POST)
+        if form.is_valid():  
+            form.save()  
+            return redirect('success_url')  
+    else:
+        form = ProductoForm()  
+
+    return render(request, 'verificar_disponibilidad.html', {'form': form})

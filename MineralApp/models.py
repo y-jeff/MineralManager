@@ -125,7 +125,20 @@ class Bodega(models.Model):
 
     def __str__(self):
         return self.nombre_bodega
+# Bodega articulos #para disponibilidad (no funciona)
+class Producto(models.Model):
+    disponibilidad_choices = [
+        ('si', 'Sí'),
+        ('no', 'No'),
+    ]
+    disponibilidad = models.CharField(
+        max_length=2,
+        choices=disponibilidad_choices,
+        default='no',
+    )
 
+    def __str__(self):
+        return f'{self.disponibilidad}'
 # Articulo en Panol
 class ArticuloPanol(models.Model):
     panol = models.ForeignKey(Panol, on_delete=models.RESTRICT)
