@@ -50,11 +50,11 @@ urlpatterns = [
 
     # Vistas de inventario
     path('pañol/', views.panol_view, name='pañol'),
-    path('panol/descargar_informe/', views.descargar_informe, name='descargar_informe'),
+    path('panol/descargar_informe/', views.descargar_informe_pañol, name='descargar_informe_pañol'),
 
     #Vista de Trabajadores
     path('trabajadores/', views.trabajadores_view, name='trabajadores'),
-     path('trabajadores/descargar_informe/', views.descargar_informe_trabajadores, name='descargar_informe_trabajadores'),
+    path('trabajadores/descargar_informe/', views.descargar_informe_trabajadores, name='descargar_informe_trabajadores'),
 
     # Vista de Bodega
     path('bodega/', views.bodega_view, name='bodega'),
