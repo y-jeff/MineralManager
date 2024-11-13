@@ -12,7 +12,7 @@ from .models import (
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .forms import ArticuloBodegaForm, ArticuloPanolForm
+from .forms import ArticuloBodegaForm, ArticuloPanolForm, ProductoForm, CapacitacionForm, TrabajadorForm, CapacitacionTrabajadorForm
 from django.contrib import messages
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas
@@ -21,7 +21,6 @@ from datetime import timedelta
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from .forms import ProductoForm #para disponibilidad (no funciona)
 
 
 # Vista para inicio de sesión
@@ -84,8 +83,6 @@ def upload_csv(request):
 def upload_success(request):
     return render(request, 'upload_success.html', {'message': 'Archivos subidos correctamente.'})
 
-# Funciones para procesar cada CSV (se mantienen sin cambios)
-# [...]
 
 # Vista de Pañol
 @login_required
@@ -217,112 +214,79 @@ def descargar_informe_pañol(request):
     return response
 
 
-# Vista de Trabajadores
+# Vista de trabajadores
 
 @login_required
 def trabajadores_view(request):
-    # Obtener listas de trabajadores, áreas, cargos y certificaciones
     trabajadores = Trabajador.objects.all()
+    certificaciones = Capacitacion.objects.all()
     areas = Area.objects.all()
     cargos = Cargo.objects.all()
-    certificaciones = Capacitacion.objects.all()
 
-    # Procesa los filtros de búsqueda
-    search_query = request.GET.get('q', '')
-    filtro_area = request.GET.get('filtro_area', '')
-    filtro_cargo = request.GET.get('filtro_cargo', '')
+    # Crear nuevo trabajador
+    if request.method == 'POST' and 'crear_trabajador' in request.POST:
+        trabajador_form = TrabajadorForm(request.POST)
+        if trabajador_form.is_valid():
+            trabajador = trabajador_form.save()
 
-    if search_query:
-        trabajadores = trabajadores.filter(
-            Q(nombre_trabajador__icontains=search_query) |
-            Q(rut__icontains=search_query)
-        )
-
-    if filtro_area:
-        trabajadores = trabajadores.filter(area_id=filtro_area)
-
-    if filtro_cargo:
-        trabajadores = trabajadores.filter(cargo_id=filtro_cargo)
-
-    # Procesar trabajadores con certificaciones próximas a expirar
-    expiring_certifications = CapacitacionTrabajador.objects.filter(fecha_fin__lte=timezone.now() + timezone.timedelta(days=30))
-    context = {
-        'trabajadores': trabajadores,
-        'areas': areas,
-        'cargos': cargos,
-        'certificaciones': certificaciones,
-        'expiring_certifications': expiring_certifications.exists(),
-    }
-
-    # Crear un nuevo trabajador
-    if request.method == 'POST' and 'crear' in request.POST:
-        rut = request.POST.get('rut')
-        nombre_trabajador = request.POST.get('nombre_trabajador')
-        area_id = request.POST.get('area')
-        cargo_id = request.POST.get('cargo')
-        
-        # Crear el trabajador
-        trabajador = Trabajador.objects.create(
-            rut=rut,
-            nombre_trabajador=nombre_trabajador,
-            area_id=area_id,
-            cargo_id=cargo_id
-        )
-        
-        # Guardar certificaciones asociadas
-        certificaciones_ids = request.POST.getlist('certificacion')
-        fechas_inicio = request.POST.getlist('fecha_inicio')
-        fechas_fin = request.POST.getlist('fecha_fin')
-        
-        for i in range(len(certificaciones_ids)):
-            CapacitacionTrabajador.objects.create(
-                trabajador=trabajador,
-                capacitacion_id=certificaciones_ids[i],
-                fecha_inicio=fechas_inicio[i],
-                fecha_fin=fechas_fin[i]
-            )
-        
-        messages.success(request, "Trabajador creado exitosamente.")
-        return redirect('trabajadores')
-
-    # Editar trabajador existente
-    if 'editar_id' in request.GET:
-        trabajador = get_object_or_404(Trabajador, rut=request.GET['editar_id'])
-        if request.method == 'POST' and 'editar' in request.POST:
-            trabajador.nombre_trabajador = request.POST.get('nombre_trabajador')
-            trabajador.area_id = request.POST.get('area')
-            trabajador.cargo_id = request.POST.get('cargo')
-            trabajador.save()
-
-            # Procesar certificaciones editadas
-            certificaciones_ids = request.POST.getlist('certificacion')
-            fechas_inicio = request.POST.getlist('fecha_inicio')
-            fechas_fin = request.POST.getlist('fecha_fin')
-            
-            # Limpiar certificaciones actuales y agregar las nuevas
-            CapacitacionTrabajador.objects.filter(trabajador=trabajador).delete()
-            for i in range(len(certificaciones_ids)):
+            # Procesar las certificaciones nuevas
+            for cert_data in request.POST.getlist('new_certificaciones'):
+                cert_id = cert_data['id']
+                fecha_inicio = cert_data['fecha_inicio']
+                fecha_fin = cert_data['fecha_fin']
+                capacitacion = get_object_or_404(Capacitacion, id=cert_id)
                 CapacitacionTrabajador.objects.create(
                     trabajador=trabajador,
-                    capacitacion_id=certificaciones_ids[i],
-                    fecha_inicio=fechas_inicio[i],
-                    fecha_fin=fechas_fin[i]
+                    capacitacion=capacitacion,
+                    fecha_inicio=fecha_inicio,
+                    fecha_fin=fecha_fin
                 )
 
-            messages.success(request, "Trabajador actualizado exitosamente.")
+            messages.success(request, "Trabajador agregado exitosamente.")
             return redirect('trabajadores')
+        else:
+            messages.error(request, "Error al agregar trabajador.")
+    else:
+        trabajador_form = TrabajadorForm()
 
-    # Eliminar trabajador
-    if 'eliminar_id' in request.GET:
-        trabajador = get_object_or_404(Trabajador, rut=request.GET['eliminar_id'])
-        trabajador.delete()
-        messages.success(request, "Trabajador eliminado exitosamente.")
-        return redirect('trabajadores')
+    # Procesar la edición de trabajador
+    if 'editar_id' in request.GET:
+        trabajador = get_object_or_404(Trabajador, rut=request.GET['editar_id'])
+        trabajador_form = TrabajadorForm(request.POST or None, instance=trabajador)
+        
+        if request.method == 'POST' and 'guardar_cambios' in request.POST:
+            if trabajador_form.is_valid():
+                trabajador_form.save()
 
+                # Procesar las certificaciones vinculadas
+                for cert_data in request.POST.getlist('certificaciones'):
+                    cert_id = cert_data['id']
+                    fecha_inicio = cert_data['fecha_inicio']
+                    fecha_fin = cert_data['fecha_fin']
+                    capacitacion = get_object_or_404(Capacitacion, id=cert_id)
+                    CapacitacionTrabajador.objects.update_or_create(
+                        trabajador=trabajador,
+                        capacitacion=capacitacion,
+                        defaults={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin}
+                    )
+
+                messages.success(request, "Trabajador y certificaciones actualizados exitosamente.")
+                return redirect('trabajadores')
+            else:
+                messages.error(request, "Error al editar trabajador.")
+
+    context = {
+        'trabajadores': trabajadores,
+        'certificaciones': certificaciones,
+        'areas': areas,
+        'cargos': cargos,
+        'trabajador_form': trabajador_form,
+    }
     return render(request, 'trabajadores.html', context)
 
-#Descargar Informe de Trabajadores
 
+
+#Descargar Informe de Trabajadores
 @login_required
 def descargar_informe_trabajadores(request):
     # Filtrar certificaciones próximas a expirar
@@ -385,30 +349,41 @@ def descargar_informe_trabajadores(request):
     response['Content-Disposition'] = 'attachment; filename="informe_certificaciones_prontas_a_expirar.pdf"'
     return response
 
-# Vista de bodega
+
+# Vista de Bodega
+
 @login_required
 def bodega_view(request):
     search_query = request.GET.get('q', '')
     ubicacion_id = request.GET.get('ubicacion', '')
     cantidad_filtro = request.GET.get('cantidad_filtro', '')
 
+    # Obtener todos los artículos en bodega
     articulos = ArticuloBodega.objects.all()
 
-    # Filtro por ubicación
-    if ubicacion_id:
-        articulos = articulos.filter(bodegas__id=ubicacion_id)
+    # Filtrar por búsqueda
+    if search_query:
+        articulos = articulos.filter(
+            Q(nombre_articulo__icontains=search_query) |
+            Q(descripcion_articulo__icontains=search_query)
+        )
 
-    # Filtro por cantidad
+    # Filtrar por ubicación
+    if ubicacion_id:
+        articulos = articulos.filter(bodega__id=ubicacion_id)
+
+    # Filtrar por cantidad
     if cantidad_filtro == 'bajo':
         articulos = articulos.filter(cantidad__lte=10, cantidad__gt=0)
     elif cantidad_filtro == 'agotado':
         articulos = articulos.filter(cantidad=0)
+
     # Procesar la creación de un artículo
     if request.method == 'POST' and 'crear' in request.POST:
         create_form = ArticuloBodegaForm(request.POST)
         if create_form.is_valid():
             create_form.save()
-            messages.success(request, "Artículo agregado exitosamente.")
+            messages.success(request, "Artículo agregado exitosamente en la bodega.")
             return redirect('bodega')
         else:
             print("Errores en el formulario de creación:", create_form.errors)
@@ -438,6 +413,7 @@ def bodega_view(request):
             messages.success(request, "Artículo eliminado exitosamente.")
             return redirect('bodega')
 
+    # Obtener advertencias para artículos con baja cantidad
     advertencias = ArticuloBodega.objects.filter(cantidad__lte=10)
     bodegas = Bodega.objects.all()
 
@@ -448,19 +424,62 @@ def bodega_view(request):
         'ubicacion_id': ubicacion_id,
         'cantidad_filtro': cantidad_filtro,
         'advertencias': advertencias,
-        'create_form': create_form,  # Formulario de creación separado
-        'edit_form': edit_form,
+        'create_form': create_form,  # Formulario de creación
+        'edit_form': edit_form,      # Formulario de edición, si aplica
     }
 
     return render(request, 'bodega.html', context)
-    #bodega disponibilidad 
-def verificar_disponibilidad(request):
-    if request.method == 'POST':  
-        form = ProductoForm(request.POST)
-        if form.is_valid():  
-            form.save()  
-            return redirect('success_url')  
-    else:
-        form = ProductoForm()  
 
-    return render(request, 'verificar_disponibilidad.html', {'form': form})
+# Descargar Informe de Bodega
+
+@login_required
+def descargar_informe_bodega(request):
+    # Filter articles with low or zero quantity in "bodega"
+    articulos_bajos = ArticuloBodega.objects.filter(cantidad__lte=10)
+
+    # Configure the PDF layout in landscape orientation
+    buffer = BytesIO()
+    pdf = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+    elements = []
+
+    # Table header
+    data = [
+        ["Nombre", "Descripción", "Cantidad", "Ubicación"]
+    ]
+
+    # Define the table style with more padding and better appearance
+    table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('TOPPADDING', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 12),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ])
+
+    # Add data for each article
+    for articulo in articulos_bajos:
+        data.append([
+            articulo.nombre_articulo,
+            articulo.descripcion_articulo,
+            articulo.cantidad,
+            articulo.bodega.nombre_bodega
+        ])
+
+    # Create the table and define column widths
+    table = Table(data, colWidths=[2*inch, 3*inch, 1*inch, 2*inch])
+    table.setStyle(table_style)
+    elements.append(table)
+
+    # Build the PDF
+    pdf.build(elements)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="informe_bodega_bajo_stock.pdf"'
+    return response

@@ -1,0 +1,16 @@
+.btn-gold {
+    background-color: #d4af37; /* Color dorado */
+    color: white;
+    border-color: #b38e10; /* Borde dorado oscuro */
+}
+
+.btn-gold:hover {
+    background-color: #b38e10; /* Dorado más oscuro en hover */
+    border-color: #8c6c09;
+    color: white;
+}
+
+.btn-gold:active {
+    background-color: #a5800a; /* Dorado aún más oscuro al hacer clic */
+    border-color: #8c6c09;
+}

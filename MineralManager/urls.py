@@ -58,4 +58,5 @@ urlpatterns = [
 
     # Vista de Bodega
     path('bodega/', views.bodega_view, name='bodega'),
+    path('bodega/descargar_informe/', views.descargar_informe_bodega, name='descargar_informe_bodega'),
 ]

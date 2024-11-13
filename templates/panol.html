@@ -9,6 +9,8 @@
     <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
     <link href="{% static 'CSS/index_style.css' %}" rel="stylesheet" />
     <link href="{% static 'CSS/logout_style.css' %}" rel="stylesheet" />
+    <link href="{% static 'CSS/download_style.css' %}" rel="stylesheet" />
+    
 </head>
 <body>
     <header>
@@ -40,11 +42,6 @@
         {% if advertencias %}
         <div class="alert alert-warning">
             <strong>Advertencia:</strong> Algunos artículos tienen cantidad baja o están agotados.
-            <ul>
-                {% for articulo in advertencias %}
-                    <li>{{ articulo.nombre_articulo }} ({{ articulo.cantidad }} en stock)</li>
-                {% endfor %}
-            </ul>
         </div>
         {% endif %}
 
@@ -69,6 +66,15 @@
                 <button class="btn btn-primary" type="submit">Buscar</button>
             </div>
         </form>
+
+        <div>
+            <!-- Botón para agregar nuevo artículo -->
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
+                <i class="fas fa-plus"></i> Agregar artículo
+            </button>
+            <!-- Botón para descargar el informe de artículos bajos en stock -->
+            <a href="{% url 'descargar_informe_pañol' %}" class="btn btn-gold">Descargar Informe de Artículos</a>
+        </div>
 
         <!-- Tabla de inventario -->
         <table class="table table-bordered table-striped mt-3">
@@ -99,7 +105,7 @@
                     </td>
                     <td>{{ articulo.panol.nombre_panol|default:"No asignado" }}</td>
                     <td>
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ articulo.id }}">
+                        <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#editModal{{ articulo.id }}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: rgba(0, 0, 0, 1);transform: ;msFilter:;"><path d="m18.988 2.012 3 3L19.701 7.3l-3-3zM8 16h3l7.287-7.287-3-3L8 13z"></path><path d="M19 19H8.158c-.026 0-.053.01-.079.01-.033 0-.066-.009-.1-.01H5V5h6.847l2-2H5c-1.103 0-2 .896-2 2v14c0 1.104.897 2 2 2h14a2 2 0 0 0 2-2v-8.668l-2 2V19z"></path></svg>
                         </button>
                         <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ articulo.id }}">
@@ -175,13 +181,6 @@
                 {% endfor %}
             </tbody>
         </table>
-
-        <!-- Botón para agregar nuevo artículo -->
-        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
-            <i class="fas fa-plus"></i> Agregar artículo
-        </button>
-        <!-- Botón para descargar el informe de artículos bajos en stock -->
-        <a href="{% url 'descargar_informe_pañol' %}" class="btn btn-info">Descargar Informe de Artículos</a>
 
             <!-- Modal para agregar nuevo artículo -->
         <div class="modal fade" id="addModal" tabindex="-1">

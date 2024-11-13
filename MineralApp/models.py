@@ -75,14 +75,13 @@ class Turno(models.Model):
 
 # Horario (Ciclo de Trabajo)
 class Horario(models.Model):
-    ciclo = models.CharField(max_length=10)  # Ejemplo: 7x7, 4x3, 5x5, etc.
-
+    ciclo = models.CharField(max_length=10)
     def __str__(self):
         return f"Ciclo {self.ciclo}"
 
 # Trabajador
 class Trabajador(models.Model):
-    rut = models.CharField(max_length=9, primary_key=True)  # RUT como clave primaria
+    rut = models.CharField(max_length=9, primary_key=True)
     nombre_trabajador = models.CharField(max_length=256)
     area = models.ForeignKey(Area, on_delete=models.RESTRICT)
     cargo = models.ForeignKey(Cargo, on_delete=models.RESTRICT)
@@ -125,7 +124,6 @@ class Bodega(models.Model):
 
     def __str__(self):
         return self.nombre_bodega
-# Bodega articulos #para disponibilidad (no funciona)
 class Producto(models.Model):
     disponibilidad_choices = [
         ('si', 'Sí'),
