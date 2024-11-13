@@ -33,6 +33,20 @@
                     </div>
                 </div>
             </div>
+                 <!-- Dropdown de usuario -->
+                 <div class="dropdown">
+                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        {{ request.user.username }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li class="dropdown-header">
+                            <strong>{{ request.user.username }}</strong><br>
+                            <small>{{ request.user.email }}</small>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+                    </ul>
+                </div>
         </nav>
     </header>
 
