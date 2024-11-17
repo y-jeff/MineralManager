@@ -360,6 +360,72 @@ def descargar_informe_pañol(request):
 
 # Vista de trabajadores
 
+# certificaciones
+@login_required
+def agregar_certificacion(request):
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre_certificacion')
+        es_renovable = request.POST.get('es_renovable', 'off') == 'on'
+
+        # Verificar si ya existe la certificación
+        if Capacitacion.objects.filter(nombre_capacitacion=nombre).exists():
+            messages.error(request, f"La certificación '{nombre}' ya existe.")
+        else:
+            Capacitacion.objects.create(nombre_capacitacion=nombre, es_renovable=es_renovable)
+            messages.success(request, f"La certificación '{nombre}' se agregó exitosamente.")
+
+        return redirect('trabajadores')  # Redirige a la vista de trabajadores
+    
+@login_required
+def asignar_certificacion(request):
+    if request.method == 'POST':
+        rut = request.POST.get('rut_trabajador')
+        certificacion_id = request.POST.get('certificacion_id')
+        fecha_inicio = request.POST.get('fecha_inicio')
+        fecha_fin = request.POST.get('fecha_fin', None)
+
+        # Verificar existencia de trabajador y certificación
+        trabajador = Trabajador.objects.filter(rut=rut).first()
+        certificacion = Capacitacion.objects.filter(id=certificacion_id).first()
+
+        if not trabajador or not certificacion:
+            messages.error(request, "Trabajador o certificación no encontrada.")
+            return redirect('trabajadores')
+
+        # Crear relación única
+        CapacitacionTrabajador.objects.create(
+            trabajador=trabajador,
+            capacitacion=certificacion,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+        )
+        messages.success(request, f"La certificación '{certificacion}' se asignó correctamente a {trabajador}.")
+        return redirect('trabajadores')
+    
+@login_required
+def editar_certificacion(request, id):
+    relacion = CapacitacionTrabajador.objects.get(id=id)
+    if request.method == 'POST':
+        fecha_inicio = request.POST.get('fecha_inicio')
+        fecha_fin = request.POST.get('fecha_fin', None)
+
+        relacion.fecha_inicio = fecha_inicio
+        relacion.fecha_fin = fecha_fin
+        relacion.save()
+
+        messages.success(request, "Certificación actualizada correctamente.")
+        return redirect('trabajadores')
+    return render(request, 'trabajadores.html', {'relacion': relacion})
+
+@login_required
+def eliminar_certificacion(request, id):
+    relacion = CapacitacionTrabajador.objects.get(id=id)
+    if request.method == 'POST':
+        relacion.delete()
+        messages.success(request, "Certificación eliminada correctamente.")
+        return redirect('trabajadores')
+    return render(request, 'trabajadores.html', {'relacion': relacion})
+
 @login_required
 def trabajadores_view(request):
     trabajadores = Trabajador.objects.all()
@@ -367,13 +433,26 @@ def trabajadores_view(request):
     areas = Area.objects.all()
     cargos = Cargo.objects.all()
 
+    # Agregar nueva certificación
+    if request.method == 'POST' and 'agregar_certificacion' in request.GET:
+        nombre_certificacion = request.POST.get('nombre_certificacion')
+        es_renovable = request.POST.get('es_renovable') == 'on'
+
+        if nombre_certificacion:
+            Capacitacion.objects.create(
+                nombre_capacitacion=nombre_certificacion,
+                es_renovable=es_renovable
+            )
+            messages.success(request, "Certificación agregada exitosamente.")
+            return redirect('trabajadores')
+
     # Crear nuevo trabajador
-    if request.method == 'POST' and 'crear_trabajador' in request.POST:
+    if request.method == 'POST' and 'crear_trabajador' in request.GET:
         trabajador_form = TrabajadorForm(request.POST)
         if trabajador_form.is_valid():
             trabajador = trabajador_form.save()
 
-            # Procesar las certificaciones nuevas
+            # Procesar certificaciones nuevas
             for cert_data in request.POST.getlist('new_certificaciones'):
                 cert_id = cert_data['id']
                 fecha_inicio = cert_data['fecha_inicio']
@@ -388,16 +467,12 @@ def trabajadores_view(request):
 
             messages.success(request, "Trabajador agregado exitosamente.")
             return redirect('trabajadores')
-        else:
-            messages.error(request, "Error al agregar trabajador.")
-    else:
-        trabajador_form = TrabajadorForm()
 
-    # Procesar la edición de trabajador
+    # Procesar edición de trabajador
     if 'editar_id' in request.GET:
         trabajador = get_object_or_404(Trabajador, rut=request.GET['editar_id'])
         trabajador_form = TrabajadorForm(request.POST or None, instance=trabajador)
-        
+
         if request.method == 'POST' and 'guardar_cambios' in request.POST:
             if trabajador_form.is_valid():
                 trabajador_form.save()
@@ -416,18 +491,14 @@ def trabajadores_view(request):
 
                 messages.success(request, "Trabajador y certificaciones actualizados exitosamente.")
                 return redirect('trabajadores')
-            else:
-                messages.error(request, "Error al editar trabajador.")
 
     context = {
         'trabajadores': trabajadores,
         'certificaciones': certificaciones,
         'areas': areas,
         'cargos': cargos,
-        'trabajador_form': trabajador_form,
     }
     return render(request, 'trabajadores.html', context)
-
 
 
 #Descargar Informe de Trabajadores

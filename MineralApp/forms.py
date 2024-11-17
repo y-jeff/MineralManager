@@ -49,18 +49,38 @@ class ArticuloBodegaForm(forms.ModelForm):
             raise forms.ValidationError("La cantidad no puede ser negativa.")
         return cantidad
 
-# Trabajadores Form
+# Formulario para Trabajador
 class TrabajadorForm(forms.ModelForm):
     class Meta:
         model = Trabajador
-        fields = ['rut', 'nombre_trabajador', 'cargo', 'area']
+        fields = ['rut', 'nombre_trabajador', 'area', 'cargo', 'jornada', 'turno', 'horario']
+        widgets = {
+            'rut': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ingrese el RUT'}),
+            'nombre_trabajador': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre Completo'}),
+            'area': forms.Select(attrs={'class': 'form-select'}),
+            'cargo': forms.Select(attrs={'class': 'form-select'}),
+            'jornada': forms.Select(attrs={'class': 'form-select'}),
+            'turno': forms.Select(attrs={'class': 'form-select'}),
+            'horario': forms.Select(attrs={'class': 'form-select'}),
+        }
 
+
+# Formulario para Certificación (Individual)
 class CapacitacionForm(forms.ModelForm):
     class Meta:
         model = Capacitacion
         fields = ['nombre_capacitacion', 'es_renovable']
+        widgets = {
+            'nombre_capacitacion': forms.TextInput(attrs={'class': 'form-control'}),
+            'es_renovable': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
 
-class CapacitacionTrabajadorForm(forms.ModelForm):
-    class Meta:
-        model = CapacitacionTrabajador
-        fields = ['capacitacion', 'fecha_inicio', 'fecha_fin']
+
+# FormSet para Certificaciones
+CertificacionFormSet = forms.inlineformset_factory(
+    Trabajador,
+    CapacitacionTrabajador,
+    form=CapacitacionForm,
+    extra=1,
+    can_delete=True,
+)
