@@ -5,7 +5,7 @@ body, h4, p, .navbar-brand, .btn {
 /* Card styling */
 .card {
     max-width: 500px;
-    margin: 20px auto;
+    margin: 40px auto;
     font-size: 1rem;
     padding: 20px;
     border-radius: 8px;
@@ -40,3 +40,4 @@ body, h4, p, .navbar-brand, .btn {
     font-size: 1rem;
     font-weight: 500;
 }
+

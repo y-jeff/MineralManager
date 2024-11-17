@@ -49,7 +49,151 @@ def login_signup_view(request):
 def index(request):
     return render(request, 'index.html')
 
-# Vista de carga de CSV
+# Procesa Trabajadores.csv
+def handle_trabajadores_csv(file):
+    """
+    Procesa el archivo Trabajadores.csv y actualiza o crea registros únicos basados en el RUT.
+    """
+    decoded_file = file.read().decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded_file)
+    for row in reader:
+        area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
+        cargo, _ = Cargo.objects.get_or_create(nombre_cargo=row['Cargo'])
+        jornada, _ = Jornada.objects.get_or_create(tipo_jornada=row['Jornada'])
+        turno, _ = Turno.objects.get_or_create(tipo_turno=row['Turno'])
+        horario, _ = Horario.objects.get_or_create(ciclo=row['Ciclo'])
+
+        Trabajador.objects.update_or_create(
+            rut=row['RUT'],  # Identificador único
+            defaults={
+                'nombre_trabajador': row['Nombre'],
+                'area': area,
+                'cargo': cargo,
+                'jornada': jornada,
+                'turno': turno,
+                'horario': horario,
+                'horas_esperadas_totales': int(row['Horas']),
+            }
+        )
+
+# Procesa Capacitaciones.csv
+def handle_capacitaciones_csv(file):
+    """
+    Procesa el archivo Capacitaciones.csv y actualiza o crea registros únicos por combinación de trabajador y capacitación.
+    """
+    decoded_file = file.read().decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded_file)
+    for row in reader:
+        trabajador = Trabajador.objects.filter(rut=row['RUT']).first()
+        if trabajador:
+            capacitacion, _ = Capacitacion.objects.get_or_create(nombre_capacitacion=row['Capacitacion'])
+            CapacitacionTrabajador.objects.update_or_create(
+                trabajador=trabajador,
+                capacitacion=capacitacion,
+                defaults={
+                    'fecha_inicio': row['Fecha Inicio'],
+                    'fecha_fin': row['Fecha Fin'] if row['Fecha Fin'] else None,
+                }
+            )
+
+# Procesa Inventario_Panol.csv
+def handle_articulo_panol_csv(file):
+    """
+    Procesa el archivo Inventario_Panol.csv y actualiza o crea registros únicos basados en nombre_articulo y pañol.
+    """
+    decoded_file = file.read().decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded_file)
+    for row in reader:
+        panol, _ = Panol.objects.get_or_create(nombre_panol=row['Pañol'])
+        ArticuloPanol.objects.update_or_create(
+            nombre_articulo=row['Nombre Articulo'],
+            panol=panol,
+            defaults={
+                'descripcion_articulo': row['Descripción'],
+                'cantidad': int(row['Cantidad']),
+            }
+        )
+
+# Procesa Inventario_Bodega.csv
+def handle_articulo_bodega_csv(file):
+    """
+    Procesa el archivo Inventario_Bodega.csv y actualiza o crea registros únicos basados en nombre_articulo y bodega.
+    """
+    decoded_file = file.read().decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded_file)
+    for row in reader:
+        bodega, _ = Bodega.objects.get_or_create(nombre_bodega=row['Bodega'])
+        ArticuloBodega.objects.update_or_create(
+            nombre_articulo=row['Nombre Articulo'],
+            bodega=bodega,
+            defaults={
+                'descripcion_articulo': row['Descripción'],
+                'cantidad': int(row['Cantidad']),
+            }
+        )
+
+# Procesa Maquinarias.csv
+def handle_maquinarias_csv(file):
+    """
+    Procesa el archivo Maquinarias.csv y actualiza o crea registros únicos basados en el código de maquinaria.
+    """
+    decoded_file = file.read().decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded_file)
+    for row in reader:
+        area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
+        Maquinaria.objects.update_or_create(
+            codigo_maquinaria=row['Código'],  # Identificador único
+            defaults={
+                'nombre_maquinaria': row['Nombre Maquinaria'],
+                'fecha_adquisicion': row['Fecha Adquisición'],
+                'estado': row['Estado'],
+                'area': area,
+            }
+        )
+
+# Procesa Mantenimiento_Maquinaria.csv
+def handle_mantenimientos_csv(file):
+    """
+    Procesa el archivo Mantenimiento_Maquinaria.csv y actualiza o crea registros únicos basados en maquinaria y fecha de mantenimiento.
+    """
+    decoded_file = file.read().decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded_file)
+    for row in reader:
+        maquinaria = Maquinaria.objects.filter(codigo_maquinaria=row['Código']).first()
+        if maquinaria:
+            MantenimientoMaquinaria.objects.update_or_create(
+                maquinaria=maquinaria,
+                fecha_mantenimiento=row['Fecha Mantenimiento'],  # Identificador único
+                defaults={
+                    'descripcion': row['Descripción'],
+                    'realizado_por': row['Realizado Por'],
+                }
+            )
+
+# Procesa Movimientos.csv
+def handle_movimientos_csv(file):
+    """
+    Procesa el archivo Movimientos.csv y actualiza o crea registros únicos basados en artículo, origen y destino.
+    """
+    decoded_file = file.read().decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded_file)
+    for row in reader:
+        articulo = ArticuloBodega.objects.filter(nombre_articulo=row['Nombre Articulo']).first()
+        if articulo:
+            origen, _ = Bodega.objects.get_or_create(nombre_bodega=row['Bodega Origen'])
+            destino, _ = Panol.objects.get_or_create(nombre_panol=row['Pañol Destino'])
+            MovimientoArticulo.objects.update_or_create(
+                articulo=articulo,
+                origen=origen,
+                destino=destino,
+                defaults={
+                    'cantidad': int(row['Cantidad']),
+                    'fecha_movimiento': row['Fecha Movimiento'],
+                    'motivo': row['Motivo'] if 'Motivo' in row else None,
+                }
+            )
+
+
 @login_required
 def upload_csv(request):
     if request.method == 'POST':

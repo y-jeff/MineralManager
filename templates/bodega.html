@@ -32,6 +32,12 @@
             </div>
         </div>
                  <!-- Dropdown de usuario -->
+                 <style>
+                    .dropdown-item.text-danger:hover {
+                      color: white !important;
+                      background-color: red !important;
+                    }
+                  </style>
                  <div class="dropdown">
                     <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                         {{ request.user.username }}

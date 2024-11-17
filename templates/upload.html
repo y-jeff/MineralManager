@@ -12,9 +12,7 @@
     <!-- Google Fonts: Roboto -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
-    <link href="{% static 'CSS/update_file_style.css' %}" rel="stylesheet" />
     <link href="{% static 'CSS/update_file.css' %}" rel="stylesheet" />
-    <link href="{% static 'CSS/logout_style.css' %}" rel="stylesheet" />
 
 </head>
 
@@ -40,6 +38,12 @@
                 </div>
             </div>
                  <!-- Dropdown de usuario -->
+                 <style>
+                    .dropdown-item.text-danger:hover {
+                      color: white !important;
+                      background-color: red !important;
+                    }
+                  </style>
                  <div class="dropdown">
                     <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                         {{ request.user.username }}
