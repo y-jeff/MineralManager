@@ -54,7 +54,14 @@ urlpatterns = [
 
     #Vista de Trabajadores
     path('trabajadores/', views.trabajadores_view, name='trabajadores'),
+    path('trabajadores/editar/<str:rut>/', views.editar_trabajador, name='editar_trabajador'),
+    path('trabajadores/eliminar/<str:rut>/', views.eliminar_trabajador, name='eliminar_trabajador'),
+
+    # Vista de certificaciones
     path('trabajadores/agregar_certificacion/', views.agregar_certificacion, name='agregar_certificacion'),
+    path('certificaciones/eliminar/<int:id>/', views.eliminar_certificacion, name='eliminar_certificacion'),
+
+    #Descargar Trabajadores
     path('trabajadores/descargar_informe/', views.descargar_informe_trabajadores, name='descargar_informe_trabajadores'),
 
     # Vista de Bodega

@@ -12,7 +12,7 @@ from .models import (
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .forms import ArticuloBodegaForm, ArticuloPanolForm, ProductoForm, CapacitacionForm, TrabajadorForm, CapacitacionTrabajadorForm
+from .forms import ArticuloBodegaForm, ArticuloPanolForm, ProductoForm, CapacitacionForm, TrabajadorForm, CapacitacionTrabajadorForm, CapacitacionTrabajadorFormSet
 from django.contrib import messages
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.pdfgen import canvas
@@ -360,146 +360,116 @@ def descargar_informe_pañol(request):
 
 # Vista de trabajadores
 
-# certificaciones
+@login_required
+def trabajadores_view(request):
+    search_query = request.GET.get('q', '')
+    trabajadores = Trabajador.objects.all()
+
+    # Filtro por búsqueda
+    if search_query:
+        trabajadores = trabajadores.filter(
+            Q(rut__icontains=search_query) |
+            Q(nombre_trabajador__icontains=search_query)
+        )
+
+    context = {
+        'trabajadores': trabajadores,
+    }
+    return render(request, 'trabajadores.html', context)
+
+# Vista para crear un trabajador
+@login_required
+def crear_trabajador(request):
+    if request.method == 'POST':
+        trabajador_form = TrabajadorForm(request.POST)
+        if trabajador_form.is_valid():
+            trabajador = trabajador_form.save()
+            messages.success(request, "Trabajador creado exitosamente.")
+            return redirect('trabajadores')
+        else:
+            messages.error(request, "Hubo un error al crear el trabajador.")
+    else:
+        trabajador_form = TrabajadorForm()
+
+    context = {
+        'trabajador_form': trabajador_form,
+    }
+    return render(request, 'crear_trabajador.html', context)
+
+# Vista para editar un trabajador
+@login_required
+def editar_trabajador(request, rut):
+    trabajador = get_object_or_404(Trabajador, rut=rut)
+    form = TrabajadorForm(request.POST or None, instance=trabajador)
+    formset = CapacitacionTrabajadorFormSet(request.POST or None, instance=trabajador)
+
+    if request.method == 'POST':
+        # Verificamos si el formulario y el formset son válidos
+        if form.is_valid() and formset.is_valid():
+            try:
+                # Guardamos el trabajador y las certificaciones
+                form.save()
+                formset.save()
+                messages.success(request, "Cambios guardados exitosamente.")
+                return redirect('trabajadores')  # Redirigimos a la lista de trabajadores
+            except Exception as e:
+                # Manejamos posibles excepciones
+                messages.error(request, f"Error al guardar los cambios: {e}")
+        else:
+            # En caso de errores de validación
+            messages.error(request, "Por favor, corrige los errores en el formulario.")
+
+    context = {
+        'form': form,
+        'formset': formset,
+        'trabajador': trabajador,
+    }
+    return render(request, 'editar_trabajador.html', context)
+
+# Vista para agregar una nueva certificación global
 @login_required
 def agregar_certificacion(request):
     if request.method == 'POST':
         nombre = request.POST.get('nombre_certificacion')
         es_renovable = request.POST.get('es_renovable', 'off') == 'on'
 
-        # Verificar si ya existe la certificación
         if Capacitacion.objects.filter(nombre_capacitacion=nombre).exists():
             messages.error(request, f"La certificación '{nombre}' ya existe.")
         else:
             Capacitacion.objects.create(nombre_capacitacion=nombre, es_renovable=es_renovable)
             messages.success(request, f"La certificación '{nombre}' se agregó exitosamente.")
-
-        return redirect('trabajadores')  # Redirige a la vista de trabajadores
-    
-@login_required
-def asignar_certificacion(request):
-    if request.method == 'POST':
-        rut = request.POST.get('rut_trabajador')
-        certificacion_id = request.POST.get('certificacion_id')
-        fecha_inicio = request.POST.get('fecha_inicio')
-        fecha_fin = request.POST.get('fecha_fin', None)
-
-        # Verificar existencia de trabajador y certificación
-        trabajador = Trabajador.objects.filter(rut=rut).first()
-        certificacion = Capacitacion.objects.filter(id=certificacion_id).first()
-
-        if not trabajador or not certificacion:
-            messages.error(request, "Trabajador o certificación no encontrada.")
-            return redirect('trabajadores')
-
-        # Crear relación única
-        CapacitacionTrabajador.objects.create(
-            trabajador=trabajador,
-            capacitacion=certificacion,
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-        )
-        messages.success(request, f"La certificación '{certificacion}' se asignó correctamente a {trabajador}.")
         return redirect('trabajadores')
-    
+
+    return render(request, 'agregar_certificacion.html')
+
+# Vista para eliminar una certificación específica de un trabajador
 @login_required
-def editar_certificacion(request, id):
-    relacion = CapacitacionTrabajador.objects.get(id=id)
-    if request.method == 'POST':
-        fecha_inicio = request.POST.get('fecha_inicio')
-        fecha_fin = request.POST.get('fecha_fin', None)
+def eliminar_trabajador(request, rut):
+    # Busca el trabajador por su RUT, o lanza un error 404 si no existe
+    trabajador = get_object_or_404(Trabajador, rut=rut)
 
-        relacion.fecha_inicio = fecha_inicio
-        relacion.fecha_fin = fecha_fin
-        relacion.save()
+    if request.method == "POST":
+        # Elimina el trabajador
+        trabajador.delete()
+        messages.success(request, f"El trabajador {trabajador.nombre_trabajador} ha sido eliminado correctamente.")
+        return redirect('trabajadores')  # Redirige a la lista de trabajadores
 
-        messages.success(request, "Certificación actualizada correctamente.")
-        return redirect('trabajadores')
-    return render(request, 'trabajadores.html', {'relacion': relacion})
+    # Renderiza la página de confirmación
+    return render(request, 'eliminar_trabajador.html', {'trabajador': trabajador})
 
 @login_required
 def eliminar_certificacion(request, id):
-    relacion = CapacitacionTrabajador.objects.get(id=id)
-    if request.method == 'POST':
-        relacion.delete()
-        messages.success(request, "Certificación eliminada correctamente.")
-        return redirect('trabajadores')
-    return render(request, 'trabajadores.html', {'relacion': relacion})
+    # Busca la certificación por su ID
+    certificacion = get_object_or_404(CapacitacionTrabajador, id=id)
 
-@login_required
-def trabajadores_view(request):
-    trabajadores = Trabajador.objects.all()
-    certificaciones = Capacitacion.objects.all()
-    areas = Area.objects.all()
-    cargos = Cargo.objects.all()
+    if request.method == "POST":
+        # Elimina la certificación
+        certificacion.delete()
+        messages.success(request, "La certificación fue eliminada correctamente.")
+        return redirect('trabajadores')  # Redirige a la vista de trabajadores
 
-    # Agregar nueva certificación
-    if request.method == 'POST' and 'agregar_certificacion' in request.GET:
-        nombre_certificacion = request.POST.get('nombre_certificacion')
-        es_renovable = request.POST.get('es_renovable') == 'on'
-
-        if nombre_certificacion:
-            Capacitacion.objects.create(
-                nombre_capacitacion=nombre_certificacion,
-                es_renovable=es_renovable
-            )
-            messages.success(request, "Certificación agregada exitosamente.")
-            return redirect('trabajadores')
-
-    # Crear nuevo trabajador
-    if request.method == 'POST' and 'crear_trabajador' in request.GET:
-        trabajador_form = TrabajadorForm(request.POST)
-        if trabajador_form.is_valid():
-            trabajador = trabajador_form.save()
-
-            # Procesar certificaciones nuevas
-            for cert_data in request.POST.getlist('new_certificaciones'):
-                cert_id = cert_data['id']
-                fecha_inicio = cert_data['fecha_inicio']
-                fecha_fin = cert_data['fecha_fin']
-                capacitacion = get_object_or_404(Capacitacion, id=cert_id)
-                CapacitacionTrabajador.objects.create(
-                    trabajador=trabajador,
-                    capacitacion=capacitacion,
-                    fecha_inicio=fecha_inicio,
-                    fecha_fin=fecha_fin
-                )
-
-            messages.success(request, "Trabajador agregado exitosamente.")
-            return redirect('trabajadores')
-
-    # Procesar edición de trabajador
-    if 'editar_id' in request.GET:
-        trabajador = get_object_or_404(Trabajador, rut=request.GET['editar_id'])
-        trabajador_form = TrabajadorForm(request.POST or None, instance=trabajador)
-
-        if request.method == 'POST' and 'guardar_cambios' in request.POST:
-            if trabajador_form.is_valid():
-                trabajador_form.save()
-
-                # Procesar las certificaciones vinculadas
-                for cert_data in request.POST.getlist('certificaciones'):
-                    cert_id = cert_data['id']
-                    fecha_inicio = cert_data['fecha_inicio']
-                    fecha_fin = cert_data['fecha_fin']
-                    capacitacion = get_object_or_404(Capacitacion, id=cert_id)
-                    CapacitacionTrabajador.objects.update_or_create(
-                        trabajador=trabajador,
-                        capacitacion=capacitacion,
-                        defaults={'fecha_inicio': fecha_inicio, 'fecha_fin': fecha_fin}
-                    )
-
-                messages.success(request, "Trabajador y certificaciones actualizados exitosamente.")
-                return redirect('trabajadores')
-
-    context = {
-        'trabajadores': trabajadores,
-        'certificaciones': certificaciones,
-        'areas': areas,
-        'cargos': cargos,
-    }
-    return render(request, 'trabajadores.html', context)
-
+    # Renderiza una página de confirmación
+    return render(request, 'eliminar_certificacion.html', {'certificacion': certificacion})
 
 #Descargar Informe de Trabajadores
 @login_required

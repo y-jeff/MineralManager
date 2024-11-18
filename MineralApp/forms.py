@@ -3,6 +3,8 @@ from .models import (
     ArticuloPanol, ArticuloBodega, Producto, 
     Trabajador, Capacitacion, CapacitacionTrabajador, Bodega
 )
+from django.forms import inlineformset_factory
+
 
 # Formulario para subir archivos
 class UploadFileForm(forms.Form):
@@ -64,8 +66,7 @@ class TrabajadorForm(forms.ModelForm):
             'horario': forms.Select(attrs={'class': 'form-select'}),
         }
 
-
-# Formulario para Certificación (Individual)
+# Formulario para Capacitaciones
 class CapacitacionForm(forms.ModelForm):
     class Meta:
         model = Capacitacion
@@ -75,12 +76,34 @@ class CapacitacionForm(forms.ModelForm):
             'es_renovable': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
+# Formulario para Capacitaciones relacionadas con Trabajadores
+class CapacitacionTrabajadorForm(forms.ModelForm):
+    class Meta:
+        model = CapacitacionTrabajador
+        fields = ['capacitacion', 'fecha_inicio', 'fecha_fin']
+        widgets = {
+            'fecha_inicio': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'fecha_fin': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        }
 
-# FormSet para Certificaciones
-CertificacionFormSet = forms.inlineformset_factory(
+    def clean_fecha_inicio(self):
+        fecha_inicio = self.cleaned_data.get('fecha_inicio')
+        if not fecha_inicio:
+            return self.instance.fecha_inicio  # Mantén la fecha existente si no se edita
+        return fecha_inicio
+
+    def clean_fecha_fin(self):
+        fecha_fin = self.cleaned_data.get('fecha_fin')
+        if not fecha_fin:
+            return self.instance.fecha_fin  # Mantén la fecha existente si no se edita
+        return fecha_fin
+
+
+# FormSet para gestionar Capacitaciones de un Trabajador
+CapacitacionTrabajadorFormSet = inlineformset_factory(
     Trabajador,
     CapacitacionTrabajador,
-    form=CapacitacionForm,
+    form=CapacitacionTrabajadorForm,
     extra=1,
-    can_delete=True,
+    can_delete=True
 )
