@@ -404,27 +404,24 @@ def editar_trabajador(request, rut):
     formset = CapacitacionTrabajadorFormSet(request.POST or None, instance=trabajador)
 
     if request.method == 'POST':
-        # Verificamos si el formulario y el formset son válidos
         if form.is_valid() and formset.is_valid():
-            try:
-                # Guardamos el trabajador y las certificaciones
-                form.save()
-                formset.save()
-                messages.success(request, "Cambios guardados exitosamente.")
-                return redirect('trabajadores')  # Redirigimos a la lista de trabajadores
-            except Exception as e:
-                # Manejamos posibles excepciones
-                messages.error(request, f"Error al guardar los cambios: {e}")
+            form.save()
+            formset.save()
+            messages.success(request, "Cambios guardados exitosamente.")
+            return redirect('trabajadores')
         else:
-            # En caso de errores de validación
-            messages.error(request, "Por favor, corrige los errores en el formulario.")
+            messages.error(request, "Por favor, corrija los errores en el formulario.")
 
-    context = {
+    # Asegurarnos de que las fechas actuales se carguen correctamente
+    for subform in formset:
+        if subform.instance.pk:  # Solo para instancias existentes
+            subform.initial['fecha_inicio'] = subform.instance.fecha_inicio
+            subform.initial['fecha_fin'] = subform.instance.fecha_fin
+
+    return render(request, 'editar_trabajador.html', {
         'form': form,
         'formset': formset,
-        'trabajador': trabajador,
-    }
-    return render(request, 'editar_trabajador.html', context)
+    })
 
 # Vista para agregar una nueva certificación global
 @login_required

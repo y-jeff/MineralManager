@@ -55,9 +55,8 @@ class ArticuloBodegaForm(forms.ModelForm):
 class TrabajadorForm(forms.ModelForm):
     class Meta:
         model = Trabajador
-        fields = ['rut', 'nombre_trabajador', 'area', 'cargo', 'jornada', 'turno', 'horario']
+        fields = ['nombre_trabajador', 'area', 'cargo', 'jornada', 'turno', 'horario']
         widgets = {
-            'rut': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ingrese el RUT'}),
             'nombre_trabajador': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre Completo'}),
             'area': forms.Select(attrs={'class': 'form-select'}),
             'cargo': forms.Select(attrs={'class': 'form-select'}),
@@ -65,6 +64,8 @@ class TrabajadorForm(forms.ModelForm):
             'turno': forms.Select(attrs={'class': 'form-select'}),
             'horario': forms.Select(attrs={'class': 'form-select'}),
         }
+
+
 
 # Formulario para Capacitaciones
 class CapacitacionForm(forms.ModelForm):
@@ -82,21 +83,15 @@ class CapacitacionTrabajadorForm(forms.ModelForm):
         model = CapacitacionTrabajador
         fields = ['capacitacion', 'fecha_inicio', 'fecha_fin']
         widgets = {
-            'fecha_inicio': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'fecha_fin': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'fecha_inicio': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control',
+            }),
+            'fecha_fin': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control',
+            }),
         }
-
-    def clean_fecha_inicio(self):
-        fecha_inicio = self.cleaned_data.get('fecha_inicio')
-        if not fecha_inicio:
-            return self.instance.fecha_inicio  # Mantén la fecha existente si no se edita
-        return fecha_inicio
-
-    def clean_fecha_fin(self):
-        fecha_fin = self.cleaned_data.get('fecha_fin')
-        if not fecha_fin:
-            return self.instance.fecha_fin  # Mantén la fecha existente si no se edita
-        return fecha_fin
 
 
 # FormSet para gestionar Capacitaciones de un Trabajador

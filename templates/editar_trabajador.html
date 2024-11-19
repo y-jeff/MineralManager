@@ -31,7 +31,35 @@
             <div class="card mb-4">
                 <div class="card-header bg-primary text-white">Información del Trabajador</div>
                 <div class="card-body">
-                    {{ form.as_p }}
+                    <!-- Rut como campo no editable -->
+                    <div class="mb-3">
+                        <label for="rut" class="form-label"><strong>RUT:</strong></label>
+                        <input type="text" id="rut" value="{{ form.instance.rut }}" class="form-control" readonly>
+                    </div>
+                    <div class="mb-3">
+                        {{ form.nombre_trabajador.label_tag }}
+                        {{ form.nombre_trabajador }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.area.label_tag }}
+                        {{ form.area }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.cargo.label_tag }}
+                        {{ form.cargo }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.jornada.label_tag }}
+                        {{ form.jornada }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.turno.label_tag }}
+                        {{ form.turno }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.horario.label_tag }}
+                        {{ form.horario }}
+                    </div>
                 </div>
             </div>
 
@@ -42,12 +70,24 @@
                     {{ formset.management_form }}
                     {% for form in formset %}
                     <div class="mb-4 p-3 border border-secondary rounded">
-                        {{ form.as_p }}
+                        {{ form.non_field_errors }}
+                        <div class="mb-3">
+                            {{ form.capacitacion.label_tag }}
+                            {{ form.capacitacion }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.fecha_inicio.label_tag }}
+                            {{ form.fecha_inicio }}
+                        </div>
+                        <div class="mb-3">
+                            {{ form.fecha_fin.label_tag }}
+                            {{ form.fecha_fin }}
+                        </div>
                         {% if form.instance.pk %}
-                        <p>
-                            <label for="id_{{ form.prefix }}-DELETE">Eliminar:</label>
+                        <div class="mb-3">
+                            <label for="{{ form.prefix }}-DELETE">Eliminar:</label>
                             {{ form.DELETE }}
-                        </p>
+                        </div>
                         {% endif %}
                     </div>
                     {% endfor %}
