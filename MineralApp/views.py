@@ -674,4 +674,55 @@ def articulobodega(request):
 #maquinaria
 @login_required
 def maquinaria(request):
-    return render(request, "maquinaria.html")
+    maquinarias = Maquinaria.objects.all()
+    areas = Area.objects.all()
+
+    # Procesar la creación de nueva maquinaria
+    if request.method == 'POST' and 'crear' in request.POST:
+        nombre_maquinaria = request.POST.get('nombre_maquinaria')
+        codigo_maquinaria = request.POST.get('codigo_maquinaria')
+        fecha_adquisicion = request.POST.get('fecha_adquisicion')
+        estado = request.POST.get('estado')
+        area_id = request.POST.get('area')
+
+        if nombre_maquinaria and codigo_maquinaria and fecha_adquisicion and estado and area_id:
+            area = get_object_or_404(Area, id=area_id)
+            Maquinaria.objects.create(
+                nombre_maquinaria=nombre_maquinaria,
+                codigo_maquinaria=codigo_maquinaria,
+                fecha_adquisicion=fecha_adquisicion,
+                estado=estado,
+                area=area
+            )
+            messages.success(request, "Nueva maquinaria creada con éxito.")
+            return redirect('maquinaria')
+
+    # Procesar la edición de maquinaria existente
+    if request.method == 'POST' and 'editar_id' in request.POST:
+        maquinaria_id = request.POST.get('editar_id')
+        maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
+
+        maquinaria.nombre_maquinaria = request.POST.get('nombre_maquinaria')
+        maquinaria.codigo_maquinaria = request.POST.get('codigo_maquinaria')
+        maquinaria.fecha_adquisicion = request.POST.get('fecha_adquisicion')
+        maquinaria.estado = request.POST.get('estado')
+        area_id = request.POST.get('area')
+        maquinaria.area = get_object_or_404(Area, id=area_id)
+        maquinaria.save()
+
+        messages.success(request, f"La maquinaria {maquinaria.nombre_maquinaria} fue actualizada con éxito.")
+        return redirect('maquinaria')
+
+    # Procesar la eliminación de maquinaria existente
+    if request.method == 'POST' and 'eliminar_id' in request.POST:
+        maquinaria_id = request.POST.get('eliminar_id')
+        maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
+        maquinaria.delete()
+        messages.success(request, f"La maquinaria {maquinaria.nombre_maquinaria} fue eliminada con éxito.")
+        return redirect('maquinaria')
+
+    context = {
+        'maquinarias': maquinarias,
+        'areas': areas,
+    }
+    return render(request, "maquinaria.html", context)
