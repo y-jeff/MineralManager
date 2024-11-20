@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>maquinaria - Mineral Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+    <link href="{% static 'CSS/index_style.css' %}" rel="stylesheet" />
+    <link href="{% static 'CSS/logout_style.css' %}" rel="stylesheet" />
+    <link href="{% static 'CSS/download_style.css' %}" rel="stylesheet" />
+</head>
+<header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
+        <div class="container-xl">
+            <a class="navbar-brand" href="/home"><h4>Mineral Manager</h4></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarCollapse">
+                <div class="navbar-nav mx-lg-auto">
+                    <a class="nav-item nav-link" href="/home">Home</a>
+                    <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
+                    <a class="nav-item nav-link active" href="/maquinaria">Maquinaria</a>
+                    <a class="nav-item nav-link" href="/pañol">Pañol</a>
+                    <a class="nav-item nav-link" href="/bodega">Bodega</a>
+                    <a class="nav-item nav-link" href="#">Retiro de Artículo</a>
+                    <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
+                    <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
+                </div>
+            </div>
+        </div>
+                 <!-- Dropdown de usuario -->
+                 <style>
+                    .dropdown-item.text-danger:hover {
+                      color: white !important;
+                      background-color: red !important;
+                    }
+                  </style>
+                 <div class="dropdown">
+                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        {{ request.user.username }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li class="dropdown-header">
+                            <strong>{{ request.user.username }}</strong><br>
+                            <small>{{ request.user.email }}</small>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+                    </ul>
+                </div>
+    </nav>
+</header>
+<body>
+    <main class="container mt-5">
+        <h1>Maquinaria</h1>
+
+        <!-- Warning for low stock -->
+        {% if advertencias %}
+        <div class="alert alert-warning">
+            <strong>Advertencia:</strong> Hay maquinarias pendientes de mantenimiento
+        </div>
+        {% endif %}
+
+        <!-- Table of inventory -->
+        <table class="table table-bordered table-striped">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th>
+                    <th>Nombre Maquinaria</th>
+                    <th>Codigo</th>
+                    <th>Fecha de adquisicion</th>
+                    <th>Estado</th>
+                    <th>Area</th>
+                </tr>
+            </thead>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                <button type="submit" class="btn btn-success" name="crear">Agregar artículo</button>
+            </div>
+            <tbody>
+                {% for maquinaria in maquinarias %}
+                <!-- Modal for editing -->
+                <div class="modal fade" id="editModal{{ maquinaria.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST" action="?editar_id={{ maquinaria.id }}">
+                                {% csrf_token %}
+                                <div class="modal-body">
+                                    <input type="hidden" name="editar" value="1">
+                                    <div class="mb-3">
+                                        <label class="form-label">codigo maquinaria</label>
+                                        <input type="text" class="form-control" name="codigo_maquinaria" value="{{ maquinaria.codigo_maquinaria }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">nombre maquinaria</label>
+                                        <input type="number" class="form-control" name="adquisicion" value="{{ maquinaria.nombre_maquinaria }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">adquisicion</label>
+                                        <input type="number" class="form-control" name="adquisicion" value="{{ maquinaria.fecha_adquisicion }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Estado</label>
+                                        <input type="number" class="form-control" name="Estado" value="{{ maquinaria.estado }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Area</label>
+                                        <select class="form-select" name="maquinaria" required>
+                                            {% for maquinaria in maquinarias %}
+                                                <option value="{{ maquinaria.id }}" {% if maquinaria.id == area.maquinaria.id %}selected{% endif %}>{{ maquinaria.area }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal for deletion -->
+                <div class="modal fade" id="deleteModal{{ articulo.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST" action="?eliminar_id={{ maquinaria.id }}">
+                                {% csrf_token %}
+                                <input type="hidden" name="eliminar" value="1">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Eliminar maquinaria</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>¿Estás seguro de que deseas eliminar la maquinaria "{{ maquinaria.nombre_maquinaria }}"?</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <!-- Modal for adding a new article -->
+        <div class="modal fade" id="addModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="POST" action="?crear=1">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h5 class="modal-title">Agregar maquinaria</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="nombre" class="form-label">maquinaria</label>
+                                <input type="text" class="form-control" name="nombre_maquinaria" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="descripcion" class="form-label">codigo</label>
+                                <textarea class="form-control" name="codigo_maquinaria" rows="3" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cantidad" class="form-label">fecha de adquisicion</label>
+                                <input type="number" class="form-control" name="fecha_adquisicion" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="cantidad" class="form-label">Estado</label>
+                                <input type="number" class="form-control" name="maquinaria.estado" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">area</label>
+                                <select class="form-select" name="maquinaria.area" required>
+                                    <option value="">Selecciona un area</option>
+                                    {% for maquinaria in maquinarias %}
+                                        <option value="{{ maquinaria.id }}">{{ maquinaria.nombre_maquinaria }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+             
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+    </main>

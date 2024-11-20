@@ -67,4 +67,10 @@ urlpatterns = [
     # Vista de Bodega
     path('bodega/', views.bodega_view, name='bodega'),
     path('bodega/descargar_informe/', views.descargar_informe_bodega, name='descargar_informe_bodega'),
+
+    # vista articulo bodega
+    path('articulobodega',views.articulobodega, name='articulobodega'),
+
+    #vista maquinaria
+    path('maquinaria',views.maquinaria, name='maquinaria'),
 ]

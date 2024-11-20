@@ -665,3 +665,13 @@ def descargar_informe_bodega(request):
     response = HttpResponse(buffer, content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="informe_bodega_bajo_stock.pdf"'
     return response
+
+
+#artciculo bodega
+@login_required
+def articulobodega(request):
+    return render(request, "articulobodega.html")
+#maquinaria
+@login_required
+def maquinaria(request):
+    return render(request, "maquinaria.html")
