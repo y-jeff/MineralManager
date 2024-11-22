@@ -189,3 +189,25 @@ class MovimientoArticulo(models.Model):
 
     def __str__(self):
         return f"Movimiento de {self.cantidad} de {self.articulo} desde {self.origen} a {self.destino}"
+
+class RegistroHoras(models.Model):
+    trabajador = models.ForeignKey(
+        Trabajador, on_delete=models.CASCADE, null=True, blank=True
+    )
+    maquinaria = models.ForeignKey(
+        Maquinaria, on_delete=models.CASCADE, null=True, blank=True
+    )
+    area = models.ForeignKey(Area, on_delete=models.CASCADE)
+    horas_trabajadas = models.PositiveIntegerField()
+    horas_esperadas = models.PositiveIntegerField(default=0)
+    fecha_registro = models.DateField()
+
+    def __str__(self):
+        referencia = (
+            self.trabajador.nombre_trabajador
+            if self.trabajador
+            else self.maquinaria.nombre_maquinaria
+            if self.maquinaria
+            else "Sin referencia"
+        )
+        return f"{referencia} - {self.horas_trabajadas} hrs ({self.fecha_registro})"

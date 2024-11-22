@@ -7,7 +7,7 @@ import csv
 from .models import (
     CustomUser, Trabajador, Area, Cargo, Horario, Jornada, Turno,
     Capacitacion, CapacitacionTrabajador, Panol, Bodega,
-    ArticuloPanol, ArticuloBodega, Maquinaria, MantenimientoMaquinaria, MovimientoArticulo
+    ArticuloPanol, ArticuloBodega, Maquinaria, MantenimientoMaquinaria, MovimientoArticulo, RegistroHoras
 )
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -15,13 +15,20 @@ from django.db.models import Q
 from .forms import ArticuloBodegaForm, ArticuloPanolForm, ProductoForm, CapacitacionForm, TrabajadorForm, CapacitacionTrabajadorForm, CapacitacionTrabajadorFormSet
 from django.contrib import messages
 from reportlab.lib.pagesizes import letter, landscape
-from reportlab.pdfgen import canvas
 from io import BytesIO
 from datetime import timedelta
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-
+from datetime import datetime, date
+from django.db.models import Sum, F, Q, Case, When, IntegerField
+import csv
+import matplotlib.pyplot as plt
+import io
+from django.http import FileResponse
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+import base64
 
 # Vista para inicio de sesión
 def login_signup_view(request):
@@ -47,8 +54,134 @@ def login_signup_view(request):
 # Página Principal
 @login_required
 def index(request):
-    return render(request, 'index.html')
+    # Datos para trabajadores
+    trabajadores = (
+        RegistroHoras.objects.filter(trabajador__isnull=False)
+        .values("area__nombre_area")
+        .annotate(
+            horas_totales=Sum("horas_trabajadas"),
+            horas_esperadas=Sum("horas_esperadas"),
+        )
+    )
 
+    # Gráficos de trabajadores
+    areas_trabajadores = [t["area__nombre_area"] for t in trabajadores]
+    horas_totales_trabajadores = [t["horas_totales"] for t in trabajadores]
+    horas_esperadas_trabajadores = [t["horas_esperadas"] for t in trabajadores]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(areas_trabajadores, horas_esperadas_trabajadores, label="Horas Esperadas", color="blue")
+    ax.bar(areas_trabajadores, horas_totales_trabajadores, label="Horas Trabajadas", color="green", alpha=0.7)
+    ax.set_title("Horas Trabajadas vs Esperadas (Trabajadores)")
+    ax.set_ylabel("Horas")
+    ax.legend()
+    plt.tight_layout()
+
+    # Convertir gráfico a base64
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format="png")
+    buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    buffer.close()
+
+    context = {
+        "chart_trabajadores": image_base64,
+    }
+
+    return render(request, "index.html", context)
+
+@login_required
+def generar_informe_pdf(request):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+
+    styles = getSampleStyleSheet()
+    content = []
+
+    # Título del informe
+    content.append(Paragraph("Informe de KPI's", styles["Title"]))
+
+    # Trabajadores
+    content.append(Paragraph("Horas Trabajadas por Trabajadores:", styles["Heading2"]))
+    trabajadores_data = [["Área", "Horas Totales", "Horas Esperadas", "Cumplimiento"]]
+    trabajadores = (
+        RegistroHoras.objects.filter(trabajador__isnull=False)
+        .values("area__nombre_area")
+        .annotate(
+            horas_totales=Sum("horas_trabajadas"),
+            horas_esperadas=Sum("horas_esperadas"),
+        )
+    )
+    for t in trabajadores:
+        cumplimiento = (
+            (t["horas_totales"] / t["horas_esperadas"]) * 100
+            if t["horas_esperadas"] > 0
+            else 0
+        )
+        trabajadores_data.append(
+            [
+                t["area__nombre_area"],
+                t["horas_totales"],
+                t["horas_esperadas"],
+                f"{cumplimiento:.2f}%",
+            ]
+        )
+    tabla_trabajadores = Table(trabajadores_data)
+    tabla_trabajadores.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.blue),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]
+        )
+    )
+    content.append(tabla_trabajadores)
+
+    # Maquinarias
+    content.append(Paragraph("Horas Trabajadas por Maquinarias:", styles["Heading2"]))
+    maquinarias_data = [["Área", "Horas Totales", "Horas Esperadas", "Cumplimiento"]]
+    maquinarias = (
+        RegistroHoras.objects.filter(maquinaria__isnull=False)
+        .values("area__nombre_area")
+        .annotate(
+            horas_totales=Sum("horas_trabajadas"),
+            horas_esperadas=Sum("horas_esperadas"),
+        )
+    )
+    for m in maquinarias:
+        cumplimiento = (
+            (m["horas_totales"] / m["horas_esperadas"]) * 100
+            if m["horas_esperadas"] > 0
+            else 0
+        )
+        maquinarias_data.append(
+            [
+                m["area__nombre_area"],
+                m["horas_totales"],
+                m["horas_esperadas"],
+                f"{cumplimiento:.2f}%",
+            ]
+        )
+    tabla_maquinarias = Table(maquinarias_data)
+    tabla_maquinarias.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.green),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 1, colors.black),
+            ]
+        )
+    )
+    content.append(tabla_maquinarias)
+
+    doc.build(content)
+    buffer.seek(0)
+    return FileResponse(buffer, as_attachment=True, filename="Informe_KPIs.pdf")
+
+#Vistas para subir archivo
 # Procesa Trabajadores.csv
 def handle_trabajadores_csv(file):
     """
@@ -193,34 +326,119 @@ def handle_movimientos_csv(file):
                 }
             )
 
+# Procesa Horas Trabajadas - Trabajadores
+def procesar_csv_trabajadores(reader):
+    """
+    Procesa un archivo CSV para registrar las horas trabajadas de los trabajadores.
+    """
+    for row in reader:
+        # Busca el trabajador basado en el RUT
+        trabajador = Trabajador.objects.filter(rut=row['RUT']).first()
 
+        if trabajador:
+            # Crear el registro de horas
+            RegistroHoras.objects.create(
+                tipo='trabajador',
+                trabajador=trabajador,
+                area=trabajador.area,  # Se asume que el trabajador tiene un área asociada
+                horas_trabajadas=int(row['Horas Trabajadas']),
+                fecha_registro=row['Fecha']  # El CSV debe incluir un campo de fecha
+            )
+        else:
+            print(f"Trabajador con RUT {row['RUT']} no encontrado.")
+
+# Procesa Horas Trabajadas - Maquinarias
+
+def procesar_csv_maquinarias(reader):
+    """
+    Procesa un archivo CSV para registrar las horas trabajadas de las maquinarias.
+    """
+    for row in reader:
+        # Busca la maquinaria basada en el código
+        maquinaria = Maquinaria.objects.filter(codigo_maquinaria=row['Código']).first()
+
+        if maquinaria:
+            # Verifica si la columna `Fecha` existe en el archivo
+            fecha_registro = row.get('Fecha', date.today())  # Usa la fecha actual si no está en el CSV
+
+            RegistroHoras.objects.create(
+                tipo='maquinaria',
+                maquinaria=maquinaria,
+                area=maquinaria.area,  # Se asume que la maquinaria tiene un área asociada
+                horas_trabajadas=int(row['Horas Trabajadas']),
+                fecha_registro=fecha_registro
+            )
+        else:
+            print(f"Maquinaria con código {row['Código']} no encontrada.")
+
+@login_required
 @login_required
 def upload_csv(request):
     if request.method == 'POST':
-        files = request.FILES.getlist('file')
+        files = request.FILES.getlist('file')  # Soporte para múltiples archivos
 
-        # Procesa Trabajadores.csv primero
         for file in files:
-            if file.name == 'Trabajadores.csv':
-                handle_trabajadores_csv(file)
+            try:
+                # Verifica si es un archivo CSV
+                if not file.name.endswith('.csv'):
+                    messages.error(request, f"{file.name} no es un archivo CSV válido.")
+                    continue
 
-        # Luego procesa los otros archivos
-        for file in files:
-            if file.name == 'Capacitaciones.csv':
-                handle_capacitaciones_csv(file)
-            elif file.name == 'Inventario_Panol.csv':
-                handle_articulo_panol_csv(file)
-            elif file.name == 'Inventario_Bodega.csv':
-                handle_articulo_bodega_csv(file)
-            elif file.name == 'Maquinarias.csv':
-                handle_maquinarias_csv(file)
-            elif file.name == 'Mantenimiento_Maquinaria.csv':
-                handle_mantenimientos_csv(file)
-            elif file.name == 'Movimientos.csv':
-                handle_movimientos_csv(file)
+                # Lee el contenido del archivo
+                decoded_file = file.read().decode('utf-8').splitlines()
+                reader = csv.DictReader(decoded_file)
 
-        return redirect('upload_success')
-    return render(request, 'upload.html')
+                # Verifica si tiene columnas requeridas
+                if file.name == 'Trabajadores.csv':
+                    required_columns = ['RUT', 'Nombre', 'Area', 'Horas']
+                    if not all(col in reader.fieldnames for col in required_columns):
+                        messages.error(request, f"{file.name} no contiene las columnas requeridas: {required_columns}.")
+                        continue
+                    handle_trabajadores_csv(file)
+                    messages.success(request, f"{file.name}: Datos de trabajadores procesados.")
+                
+                elif file.name == 'Maquinarias.csv':
+                    required_columns = ['Código', 'Horas Trabajadas', 'Fecha']
+                    if not all(col in reader.fieldnames for col in required_columns):
+                        messages.error(request, f"{file.name} no contiene las columnas requeridas: {required_columns}.")
+                        continue
+                    procesar_csv_maquinarias(reader)
+                    messages.success(request, f"{file.name}: Horas de maquinarias procesadas.")
+                
+                elif file.name == 'Capacitaciones.csv':
+                    required_columns = ['RUT', 'Capacitacion', 'Fecha Inicio']
+                    if not all(col in reader.fieldnames for col in required_columns):
+                        messages.error(request, f"{file.name} no contiene las columnas requeridas: {required_columns}.")
+                        continue
+                    handle_capacitaciones_csv(file)
+                    messages.success(request, f"{file.name}: Datos de capacitaciones procesados.")
+
+                # Agrega validaciones para otros tipos de archivos
+                elif file.name == 'Inventario_Panol.csv':
+                    handle_articulo_panol_csv(file)
+                    messages.success(request, f"{file.name}: Datos de inventario de pañol procesados.")
+
+                elif file.name == 'Inventario_Bodega.csv':
+                    handle_articulo_bodega_csv(file)
+                    messages.success(request, f"{file.name}: Datos de inventario de bodega procesados.")
+
+                elif file.name == 'Mantenimiento_Maquinaria.csv':
+                    handle_mantenimientos_csv(file)
+                    messages.success(request, f"{file.name}: Datos de mantenimientos procesados.")
+
+                elif file.name == 'Movimientos.csv':
+                    handle_movimientos_csv(file)
+                    messages.success(request, f"{file.name}: Datos de movimientos procesados.")
+
+                else:
+                    messages.error(request, f"{file.name}: El archivo no es reconocido.")
+            
+            except Exception as e:
+                messages.error(request, f"Ocurrió un error procesando {file.name}: {e}")
+
+        return redirect('upload_success')  # Redirige a la página de éxito
+
+    return render(request, 'upload.html')  # Renderiza la página de subida
 
 # Página de éxito de carga
 @login_required

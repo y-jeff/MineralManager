@@ -1,137 +1,123 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-    {% load static %}
-    <head>
-        <title>Inicio</title>
-        <!-- Required meta tags -->
-        <meta charset="utf-8" />
-        <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1, shrink-to-fit=no"
-        />
-
-        <!-- Bootstrap CSS v5.2.1 -->
-        <link
-            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
-            rel="stylesheet"
-            integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
-            crossorigin="anonymous"
-        />
-        <link href="{% static 'CSS/index_style.css' %}" rel="stylesheet" />
-        <link href="{% static 'CSS/logout_style.css' %}" rel="stylesheet" />
-    </head>
-
-    <body>
-        <header>
-            <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
-                <div class="container-xl">
-                    <a class="navbar-brand" href="/home"><h4>Mineral Manager</h4></a>
-                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <div class="collapse navbar-collapse" id="navbarCollapse">
-                        <div class="navbar-nav mx-lg-auto">
-                            <a class="nav-item nav-link active" href="/home">Home</a>
-                            <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
-                            <a class="nav-item nav-link" href="/maquinaria">Maquinaria</a>
-                            <a class="nav-item nav-link" href="/pañol">Pañol</a>
-                            <a class="nav-item nav-link" href="/bodega">Bodega</a>
-                            <a class="nav-item nav-link" href="#">Retiro de Artículo</a>
-                            <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
-                            <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
-                        </div>
-                    </div>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        .card {
+            margin: 10px;
+        }
+        .chart-container {
+            height: 400px;
+        }
+    </style>
+</head>
+<header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
+        <div class="container-xl">
+            <a class="navbar-brand" href="/home"><h4>Mineral Manager</h4></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarCollapse">
+                <div class="navbar-nav mx-lg-auto">
+                    <a class="nav-item nav-link active" href="/home">Home</a>
+                    <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
+                    <a class="nav-item nav-link" href="/maquinaria">Maquinaria</a>
+                    <a class="nav-item nav-link" href="/pañol">Pañol</a>
+                    <a class="nav-item nav-link" href="/bodega">Bodega</a>
+                    <a class="nav-item nav-link" href="#">Retiro de Artículo</a>
+                    <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
+                    <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
                 </div>
-                 <!-- Dropdown de usuario -->
-                 <style>
-                    .dropdown-item.text-danger:hover {
-                      color: white !important;
-                      background-color: red !important;
-                    }
-                  </style>
-                 <div class="dropdown">
-                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        {{ request.user.username }}
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                        <li class="dropdown-header">
-                            <strong>{{ request.user.username }}</strong><br>
-                            <small>{{ request.user.email }}</small>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
-                    </ul>
-                </div>
-            </nav>
-        </header>
-        <main>
-            <div id="wrapper">
-                  </div>
-                  <!-- /.navbar-header -->
-                  
-                  <div class="chart">
-                    <canvas id="myChart" width="400" height="200"></canvas>
-                  </div>
-                
-                  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.6.0/Chart.js"></script>
+            </div>
+        </div>
+        <div class="dropdown">
+            <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                {{ request.user.username }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                <li class="dropdown-header">
+                    <strong>{{ request.user.username }}</strong><br>
+                    <small>{{ request.user.email }}</small>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+            </ul>
+        </div>
+    </nav>
+</header>
+<body>
+    <div class="container mt-5">
+        <div class="row text-center">
+          <div class="col-md-3">
+            <button class="btn btn-primary">Horas Trabajadores</button>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-success">Horas Maquinarias</button>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-danger">Maquinarias en Mantenimiento</button>
+          </div>
+          <div class="col-md-3">
+            <a href="{% url 'generar_informe_pdf' %}" class="btn btn-warning">Descargar Informe</a>
+          </div>
+        </div>
+      
+        <div class="row mt-5">
+          <div class="col-md-6">
+            <h4>Horas Trabajadas (Trabajadores)</h4>
+            <img src="data:image/png;base64,{{ chart_trabajadores }}" alt="Gráfico de Trabajadores" />
+          </div>
+          <div class="col-md-6">
+            <h4>Horas Trabajadas (Maquinarias)</h4>
+            <!-- Aquí se puede añadir otro gráfico similar -->
+          </div>
+        </div>
+      </div>
+      
+   
+      
 
-        </main>
-        <footer>
-            <!-- place footer here -->
-        </footer>
-        <!-- Bootstrap JavaScript Libraries -->
-        <script
-            src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
-            integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
-            crossorigin="anonymous"
-        ></script>
-
-        <script
-            src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.min.js"
-            integrity="sha384-BBtl+eGJRgqQAUMxJ7pMwbEyER4l1g+O15P+16Ep7Q9Q+zqX6gSbd85u4mG4QzX+"
-            crossorigin="anonymous"
-        ></script>
-        <script>
-            var ctx = document.getElementById('myChart').getContext('2d');
-            var chart = new Chart(ctx, {
-                type: 'line', // Tipo de gráfico
-                data: {
-                    labels: ["Jun 2016", "Jul 2016", "Aug 2016", "Sep 2016", "Oct 2016", "Nov 2016", "Dec 2016", "Jan 2017", "Feb 2017", "Mar 2017", "Apr 2017", "May 2017"],
-                    datasets: [{
-                        label: "Rainfall",
-                        backgroundColor: 'lightblue',
-                        borderColor: 'royalblue',
-                        data: [26.4, 39.8, 66.8, 66.4, 40.6, 55.2, 77.4, 69.8, 57.8, 76, 110.8, 142.6],
-                    }]
-                },
-                options: {
-                    layout: {
-                        padding: 10,
-                    },
-                    legend: {
-                        position: 'bottom',
-                    },
-                    title: {
-                        display: true,
-                        text: 'Precipitation in Toronto'
-                    },
-                    scales: {
-                        yAxes: [{
-                            scaleLabel: {
-                                display: true,
-                                labelString: 'Precipitation in mm'
-                            }
-                        }],
-                        xAxes: [{
-                            scaleLabel: {
-                                display: true,
-                                labelString: 'Month of the Year'
-                            }
-                        }]
-                    }
-                }
-            });
-        </script>
-
-    </body>
+    <script>
+        // Gráfico de Trabajadores
+        const trabajadoresCtx = document.getElementById('trabajadoresChart').getContext('2d');
+        const trabajadoresData = {
+            labels: {{ trabajadores_labels|safe }},
+            datasets: [{
+                label: 'Horas Trabajadas',
+                data: {{ trabajadores_data|safe }},
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        };
+        new Chart(trabajadoresCtx, {
+            type: 'bar',
+            data: trabajadoresData,
+            options: { responsive: true }
+        });
+    
+        // Gráfico de Maquinarias
+        const maquinariasCtx = document.getElementById('maquinariasChart').getContext('2d');
+        const maquinariasData = {
+            labels: {{ maquinarias_labels|safe }},
+            datasets: [{
+                label: 'Horas Maquinarias',
+                data: {{ maquinarias_data|safe }},
+                backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                borderColor: 'rgba(255, 99, 132, 1)',
+                borderWidth: 1
+            }]
+        };
+        new Chart(maquinariasCtx, {
+            type: 'bar',
+            data: maquinariasData,
+            options: { responsive: true }
+        });
+    </script>
+</body>
 </html>

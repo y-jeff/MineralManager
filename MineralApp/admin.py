@@ -3,7 +3,7 @@ from .models import (
     CustomUser, Area, Cargo, Jornada, Turno, Horario, Trabajador,
     Capacitacion, CapacitacionTrabajador, Panol, Bodega,
     ArticuloPanol, ArticuloBodega, Maquinaria, MantenimientoMaquinaria,
-    MovimientoArticulo
+    MovimientoArticulo, RegistroHoras
 )
 
 # Registrar todos los modelos en el panel de administración
@@ -23,3 +23,4 @@ admin.site.register(ArticuloBodega)
 admin.site.register(Maquinaria)
 admin.site.register(MantenimientoMaquinaria)
 admin.site.register(MovimientoArticulo)
+admin.site.register(RegistroHoras)

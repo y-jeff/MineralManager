@@ -33,7 +33,10 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.login_signup_view, name='login_signup'),
     path('logout/', auth_views.LogoutView.as_view(next_page='login_signup'), name='logout'),
+
+    #Vista de inicio
     path('home/', views.index, name='home'),
+    path('descargar_informe/', views.generar_informe_pdf, name='generar_informe_pdf'),
 
     # Subida de archivo
     path('upload/', views.upload_csv, name='upload_file'),
