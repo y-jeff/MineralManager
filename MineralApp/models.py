@@ -164,6 +164,7 @@ class Maquinaria(models.Model):
     fecha_adquisicion = models.DateField()
     estado = models.CharField(max_length=50)
     area = models.ForeignKey(Area, on_delete=models.RESTRICT)
+    horas_esperadas = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return f"{self.nombre_maquinaria} ({self.codigo_maquinaria})"
@@ -191,23 +192,9 @@ class MovimientoArticulo(models.Model):
         return f"Movimiento de {self.cantidad} de {self.articulo} desde {self.origen} a {self.destino}"
 
 class RegistroHoras(models.Model):
-    trabajador = models.ForeignKey(
-        Trabajador, on_delete=models.CASCADE, null=True, blank=True
-    )
-    maquinaria = models.ForeignKey(
-        Maquinaria, on_delete=models.CASCADE, null=True, blank=True
-    )
+    maquinaria = models.ForeignKey(Maquinaria, null=True, blank=True, on_delete=models.CASCADE)
+    trabajador = models.ForeignKey(Trabajador, null=True, blank=True, on_delete=models.CASCADE)
     area = models.ForeignKey(Area, on_delete=models.CASCADE)
-    horas_trabajadas = models.PositiveIntegerField()
-    horas_esperadas = models.PositiveIntegerField(default=0)
+    horas_trabajadas = models.IntegerField()
+    horas_esperadas = models.IntegerField(null=True, blank=True)
     fecha_registro = models.DateField()
-
-    def __str__(self):
-        referencia = (
-            self.trabajador.nombre_trabajador
-            if self.trabajador
-            else self.maquinaria.nombre_maquinaria
-            if self.maquinaria
-            else "Sin referencia"
-        )
-        return f"{referencia} - {self.horas_trabajadas} hrs ({self.fecha_registro})"

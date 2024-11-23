@@ -11,104 +11,118 @@
             padding: 20px;
             margin: 15px;
             color: #fff;
-        }
-        .kpi-card h5 {
-            margin-bottom: 15px;
+            text-align: center;
         }
         .kpi-chart {
             background-color: #f8f9fa;
             border-radius: 10px;
             padding: 15px;
         }
+        .progress-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: conic-gradient(
+                green 75%, 
+                lightgray 0 100%
+            );
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: auto;
+        }
+        .progress-circle span {
+            font-weight: bold;
+        }
     </style>
 </head>
-
-<header>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
-        <div class="container-xl">
-            <a class="navbar-brand" href="/home"><h4>Mineral Manager</h4></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarCollapse">
-                <div class="navbar-nav mx-lg-auto">
-                    <a class="nav-item nav-link active" href="/home">Home</a>
-                    <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
-                    <a class="nav-item nav-link" href="/maquinaria">Maquinaria</a>
-                    <a class="nav-item nav-link" href="/pañol">Pañol</a>
-                    <a class="nav-item nav-link" href="/bodega">Bodega</a>
-                    <a class="nav-item nav-link" href="#">Retiro de Artículo</a>
-                    <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
-                    <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
+            <div class="container-xl">
+                <a class="navbar-brand" href="/home"><h4>Mineral Manager</h4></a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarCollapse">
+                    <div class="navbar-nav mx-lg-auto">
+                        <a class="nav-item nav-link active" href="/home">Home</a>
+                        <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
+                        <a class="nav-item nav-link" href="/maquinaria">Maquinaria</a>
+                        <a class="nav-item nav-link" href="/pañol">Pañol</a>
+                        <a class="nav-item nav-link" href="/bodega">Bodega</a>
+                        <a class="nav-item nav-link" href="#">Retiro de Artículo</a>
+                        <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
+                        <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
+                    </div>
                 </div>
             </div>
-        </div>
-                 <!-- Dropdown de usuario -->
-                 <style>
-                    .dropdown-item.text-danger:hover {
-                      color: white !important;
-                      background-color: red !important;
-                    }
-                  </style>
-                 <div class="dropdown">
-                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        {{ request.user.username }}
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                        <li class="dropdown-header">
-                            <strong>{{ request.user.username }}</strong><br>
-                            <small>{{ request.user.email }}</small>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
-                    </ul>
-                </div>
-    </nav>
-</header>
-
-<body>
+                     <!-- Dropdown de usuario -->
+                     <style>
+                        .dropdown-item.text-danger:hover {
+                          color: white !important;
+                          background-color: red !important;
+                        }
+                      </style>
+                     <div class="dropdown">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            {{ request.user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li class="dropdown-header">
+                                <strong>{{ request.user.username }}</strong><br>
+                                <small>{{ request.user.email }}</small>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+                        </ul>
+                    </div>
+        </nav>
+    </header>
 
     <div class="container my-4">
         <div class="row">
             <!-- KPI Cards -->
             <div class="col-md-3">
                 <div class="kpi-card bg-primary">
-                    <h5>Total Horas Trabajadores</h5>
-                    <p><strong>12000</strong> hrs</p>
+                    <h5>Horas Esperadas (Trabajadores)</h5>
+                    <p><strong>{{ total_horas_esperadas_trabajadores }}</strong> hrs</p>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="kpi-card bg-success">
-                    <h5>Total Horas Maquinarias</h5>
-                    <p><strong>8000</strong> hrs</p>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-card bg-danger">
-                    <h5>Maquinarias en Mantenimiento</h5>
-                    <p><strong>5</strong></p>
+                    <h5>Horas Trabajadas (Trabajadores)</h5>
+                    <p><strong>{{ total_horas_trabajadas_trabajadores }}</strong> hrs</p>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="kpi-card bg-warning">
-                    <h5>Porcentaje Cumplimiento</h5>
-                    <p><strong>95%</strong></p>
+                    <h5>Horas Esperadas (Maquinarias)</h5>
+                    <p><strong>{{ total_horas_esperadas_maquinarias }}</strong> hrs</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="kpi-card bg-danger">
+                    <h5>Horas Trabajadas (Maquinarias)</h5>
+                    <p><strong>{{ total_horas_trabajadas_maquinarias }}</strong> hrs</p>
                 </div>
             </div>
         </div>
 
         <div class="row">
-            <!-- KPI Graphs -->
+            <!-- Charts -->
             <div class="col-md-6">
                 <div class="kpi-chart">
-                    <h5>Horas Trabajadas por Área (Trabajadores)</h5>
-                    <img src="data:image/png;base64,{{ chart_trabajadores }}" alt="Horas Trabajadas Trabajadores" class="img-fluid">
+                    <h5>Top Maquinarias por Uso</h5>
+                    <img src="data:image/png;base64,{{ chart_top_maquinarias }}" alt="Top Maquinarias" class="img-fluid">
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="kpi-chart">
-                    <h5>Horas Trabajadas por Área (Maquinarias)</h5>
-                    <img src="data:image/png;base64,{{ chart_maquinarias }}" alt="Horas Trabajadas Maquinarias" class="img-fluid">
+                    <h5>Progreso de Maquinarias Utilizadas</h5>
+                    <div class="progress-circle">
+                        <span>{{ porcentaje_maquinarias_utilizadas }}%</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -116,41 +130,18 @@
         <div class="row mt-4">
             <div class="col-md-6">
                 <div class="kpi-chart">
-                    <h5>Resumen Cumplimiento</h5>
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Área</th>
-                                <th>Horas Esperadas</th>
-                                <th>Horas Cumplidas</th>
-                                <th>Cumplimiento</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for area in estadisticas %}
-                            <tr>
-                                <td>{{ area.nombre }}</td>
-                                <td>{{ area.horas_esperadas }}</td>
-                                <td>{{ area.horas_cumplidas }}</td>
-                                <td>{{ area.porcentaje }}%</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                    <h5>Horas Trabajadas vs. Esperadas (Trabajadores)</h5>
+                    <img src="data:image/png;base64,{{ chart_trabajadores }}" alt="Horas Trabajadas Trabajadores" class="img-fluid">
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="kpi-chart">
-                    <h5>Top Maquinarias por Uso</h5>
-                    <img src="data:image/png;base64,{{ chart_top_maquinarias }}" alt="Top Maquinarias" class="img-fluid">
+                    <h5>Horas Trabajadas vs. Esperadas (Maquinarias)</h5>
+                    <img src="data:image/png;base64,{{ chart_maquinarias }}" alt="Horas Trabajadas Maquinarias" class="img-fluid">
                 </div>
             </div>
         </div>
     </div>
-
-    <footer class="text-center py-3 bg-dark text-white">
-        <p>Dashboard KPI - © 2024</p>
-    </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>

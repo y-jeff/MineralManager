@@ -29,6 +29,8 @@ from django.http import FileResponse
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 import base64
+from itertools import chain
+
 
 # Vista para inicio de sesión
 def login_signup_view(request):
@@ -52,44 +54,123 @@ def login_signup_view(request):
     return render(request, 'login.html')
 
 # Página Principal
+
 @login_required
 def index(request):
-    # Datos para trabajadores
+    # Datos de trabajadores por área
     trabajadores = (
         RegistroHoras.objects.filter(trabajador__isnull=False)
         .values("area__nombre_area")
         .annotate(
             horas_totales=Sum("horas_trabajadas"),
-            horas_esperadas=Sum("horas_esperadas"),
+            horas_esperadas=Sum("trabajador__horas_esperadas_totales"),  # Ajustado para trabajadores
         )
     )
 
+    # Datos de maquinarias por área
+    maquinarias = (
+        RegistroHoras.objects.filter(maquinaria__isnull=False)
+        .values("area__nombre_area", "maquinaria__nombre_maquinaria")  # Incluyendo nombre_maquinaria
+        .annotate(
+            horas_totales=Sum("horas_trabajadas"),
+            horas_esperadas=Sum("maquinaria__horas_esperadas"),  # Ajustado para maquinarias
+        )
+    )
+
+    # Calcular porcentaje de cumplimiento
+    estadisticas = [
+        {
+            "nombre": area["area__nombre_area"],
+            "horas_esperadas": area.get("horas_esperadas", 0),
+            "horas_cumplidas": area["horas_totales"],
+            "porcentaje": round(
+                (area["horas_totales"] / area["horas_esperadas"] * 100)
+                if area["horas_esperadas"] > 0
+                else 0,
+                2,
+            ),
+        }
+        for area in list(trabajadores) + list(maquinarias)
+    ]
+
     # Gráficos de trabajadores
-    areas_trabajadores = [t["area__nombre_area"] for t in trabajadores]
-    horas_totales_trabajadores = [t["horas_totales"] for t in trabajadores]
-    horas_esperadas_trabajadores = [t["horas_esperadas"] for t in trabajadores]
+    chart_trabajadores = generar_grafico_horas(
+        trabajadores, "Horas Trabajadas por Área (Trabajadores)"
+    )
+
+    # Gráficos de maquinarias
+    chart_maquinarias = generar_grafico_horas(
+        maquinarias, "Horas Trabajadas por Área (Maquinarias)", color1="orange", color2="purple"
+    )
+
+    # Gráfico de top maquinarias por uso
+    chart_top_maquinarias = generar_grafico_top_maquinarias(maquinarias)
+
+    context = {
+        "chart_trabajadores": chart_trabajadores,
+        "chart_maquinarias": chart_maquinarias,
+        "chart_top_maquinarias": chart_top_maquinarias,
+        "estadisticas": estadisticas,
+    }
+
+    return render(request, "index.html", context)
+
+
+def generar_grafico_horas(data, titulo, color1="blue", color2="green"):
+    """
+    Genera un gráfico de barras para comparar horas esperadas y trabajadas.
+    """
+    if not data:
+        return ""
+
+    areas = [d["area__nombre_area"] for d in data]
+    horas_esperadas = [d["horas_esperadas"] for d in data]
+    horas_totales = [d["horas_totales"] for d in data]
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(areas_trabajadores, horas_esperadas_trabajadores, label="Horas Esperadas", color="blue")
-    ax.bar(areas_trabajadores, horas_totales_trabajadores, label="Horas Trabajadas", color="green", alpha=0.7)
-    ax.set_title("Horas Trabajadas vs Esperadas (Trabajadores)")
+    ax.bar(areas, horas_esperadas, label="Horas Esperadas", color=color1)
+    ax.bar(areas, horas_totales, label="Horas Trabajadas", color=color2, alpha=0.7)
+    ax.set_title(titulo)
     ax.set_ylabel("Horas")
+    ax.set_xticks(range(len(areas)))
+    ax.set_xticklabels(areas, rotation=45, ha="right")
     ax.legend()
     plt.tight_layout()
 
-    # Convertir gráfico a base64
     buffer = io.BytesIO()
     plt.savefig(buffer, format="png")
     buffer.seek(0)
     image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
     buffer.close()
+    return image_base64
 
-    context = {
-        "chart_trabajadores": image_base64,
-    }
 
-    return render(request, "index.html", context)
+def generar_grafico_top_maquinarias(data):
+    """
+    Genera un gráfico de barras para mostrar el top de maquinarias por uso.
+    """
+    if not data:
+        return ""
 
+    nombres_maquinarias = [m.get("maquinaria__nombre_maquinaria", "Desconocida") for m in data]
+    horas_totales = [m["horas_totales"] for m in data]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.bar(nombres_maquinarias, horas_totales, color="cyan")
+    ax.set_title("Top Maquinarias por Uso")
+    ax.set_ylabel("Horas Totales")
+    ax.set_xticks(range(len(nombres_maquinarias)))
+    ax.set_xticklabels(nombres_maquinarias, rotation=45, ha="right")
+    plt.tight_layout()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format="png")
+    buffer.seek(0)
+    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    buffer.close()
+    return image_base64
+
+# Generar informe
 @login_required
 def generar_informe_pdf(request):
     buffer = io.BytesIO()
@@ -273,7 +354,10 @@ def handle_maquinarias_csv(file):
     decoded_file = file.read().decode('utf-8').splitlines()
     reader = csv.DictReader(decoded_file)
     for row in reader:
+        # Obtén o crea el área asociada
         area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
+        
+        # Actualiza o crea la maquinaria con horas esperadas
         Maquinaria.objects.update_or_create(
             codigo_maquinaria=row['Código'],  # Identificador único
             defaults={
@@ -281,6 +365,7 @@ def handle_maquinarias_csv(file):
                 'fecha_adquisicion': row['Fecha Adquisición'],
                 'estado': row['Estado'],
                 'area': area,
+                'horas_esperadas': int(row['Horas Esperadas']),
             }
         )
 
@@ -371,7 +456,7 @@ def procesar_csv_maquinarias(reader):
         else:
             print(f"Maquinaria con código {row['Código']} no encontrada.")
 
-@login_required
+            
 @login_required
 def upload_csv(request):
     if request.method == 'POST':
