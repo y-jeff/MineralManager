@@ -31,43 +31,39 @@
                 </div>
             </div>
         </div>
-                 <!-- Dropdown de usuario -->
-                 <style>
-                    .dropdown-item.text-danger:hover {
-                      color: white !important;
-                      background-color: red !important;
-                    }
-                  </style>
-                 <div class="dropdown">
-                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        {{ request.user.username }}
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                        <li class="dropdown-header">
-                            <strong>{{ request.user.username }}</strong><br>
-                            <small>{{ request.user.email }}</small>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
-                    </ul>
-                </div>
+        <!-- Dropdown de usuario -->
+        <style>
+            .dropdown-item.text-danger:hover {
+                color: white !important;
+                background-color: red !important;
+            }
+        </style>
+        <div class="dropdown">
+            <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                {{ request.user.username }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                <li class="dropdown-header">
+                    <strong>{{ request.user.username }}</strong><br>
+                    <small>{{ request.user.email }}</small>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+            </ul>
+        </div>
     </nav>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </header>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mover Artículos</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
-</head>
 <body>
-    <div class="container mt-5">
-        <h1>Mover Artículos</h1>
-        <form method="post">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit" class="btn btn-primary">Registrar Movimiento</button>
-        </form>
+    <div class="d-flex justify-content-center align-items-center vh-100" style="margin-top: -190px;">
+        <div class="container text-center p-4" style="max-width: 500px; border: 1px solid #ccc; border-radius: 15px; background-color: #f8f9fa;">
+            <h1 class="mb-4">Mover Artículos</h1>
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-primary mt-3">Registrar Movimiento</button>
+            </form>
+        </div>
     </div>
 </body>
 </html>
