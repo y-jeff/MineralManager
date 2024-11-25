@@ -1,7 +1,7 @@
 from django import forms
 from .models import (
     ArticuloPanol, ArticuloBodega, Producto, 
-    Trabajador, Capacitacion, CapacitacionTrabajador, Bodega
+    Trabajador, Capacitacion, CapacitacionTrabajador, Bodega, MovimientoArticulo, RetiroArticulo
 )
 from django.forms import inlineformset_factory
 
@@ -102,3 +102,19 @@ CapacitacionTrabajadorFormSet = inlineformset_factory(
     extra=1,
     can_delete=True
 )
+
+#formulario de bodega  aarticulo
+class MovimientoArticuloForm(forms.ModelForm):
+    class Meta:
+        model = MovimientoArticulo
+        fields = ['articulo', 'origen', 'destino', 'cantidad', 'motivo']
+        widgets = {
+            'motivo': forms.TextInput(attrs={'placeholder': 'Motivo de movimiento'}),
+            'fecha_movimiento': forms.HiddenInput(),  # Se puede manejar automáticamente
+        }
+
+#formulario de retiro
+class RetiroArticuloForm(forms.ModelForm):
+    class Meta:
+        model = RetiroArticulo
+        fields = ['trabajador', 'articulo', 'cantidad']

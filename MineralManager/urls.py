@@ -72,8 +72,11 @@ urlpatterns = [
     path('bodega/descargar_informe/', views.descargar_informe_bodega, name='descargar_informe_bodega'),
 
     # vista articulo bodega
-    path('articulobodega',views.articulobodega, name='articulobodega'),
+    path("articulobodega/", views.articulo_bodega_view, name="articulo_bodega"),
 
     #vista maquinaria
     path('maquinaria',views.maquinaria, name='maquinaria'),
+
+    #vista retiro
+    path('retiro/', views.retiro_articulo_view, name='retiro_articulo'),
 ]

@@ -7,12 +7,12 @@ import csv
 from .models import (
     CustomUser, Trabajador, Area, Cargo, Horario, Jornada, Turno,
     Capacitacion, CapacitacionTrabajador, Panol, Bodega,
-    ArticuloPanol, ArticuloBodega, Maquinaria, MantenimientoMaquinaria, MovimientoArticulo, RegistroHoras
+    ArticuloPanol, ArticuloBodega, Maquinaria, MantenimientoMaquinaria, MovimientoArticulo, RegistroHoras, RetiroArticulo
 )
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from .forms import ArticuloBodegaForm, ArticuloPanolForm, ProductoForm, CapacitacionForm, TrabajadorForm, CapacitacionTrabajadorForm, CapacitacionTrabajadorFormSet
+from .forms import ArticuloBodegaForm, ArticuloPanolForm, ProductoForm, CapacitacionForm, TrabajadorForm, CapacitacionTrabajadorForm, CapacitacionTrabajadorFormSet, MovimientoArticuloForm, RetiroArticuloForm
 from django.contrib import messages
 from reportlab.lib.pagesizes import letter, landscape
 from io import BytesIO
@@ -972,8 +972,21 @@ def descargar_informe_bodega(request):
 
 #artciculo bodega
 @login_required
-def articulobodega(request):
-    return render(request, "articulobodega.html")
+def articulo_bodega_view(request):
+    if request.method == 'POST':
+        form = MovimientoArticuloForm(request.POST)
+        if form.is_valid():
+            form.save()
+            # Puedes añadir un mensaje de éxito
+            return redirect('articulo_bodega')
+    else:
+        form = MovimientoArticuloForm()
+
+    articulos = ArticuloBodega.objects.all()
+    return render(request, 'articulobodega.html', {'form': form, 'articulos': articulos})
+
+
+
 #maquinaria
 @login_required
 def maquinaria(request):
@@ -1029,3 +1042,20 @@ def maquinaria(request):
         'areas': areas,
     }
     return render(request, "maquinaria.html", context)
+
+
+#retiro articulo
+def retiro_articulo_view(request):
+    # Recuperamos todos los retiros realizados para mostrarlos en el historial
+    retiros = RetiroArticulo.objects.all()
+
+    if request.method == 'POST':
+        form = RetiroArticuloForm(request.POST)
+        if form.is_valid():
+            form.save()
+            # Redirigimos a la misma página para actualizar la lista después del registro
+            return redirect('retiro_articulo')
+    else:
+        form = RetiroArticuloForm()
+
+    return render(request, 'retiroarticulo.html', {'form': form, 'retiros': retiros})

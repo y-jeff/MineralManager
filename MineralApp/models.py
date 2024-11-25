@@ -187,10 +187,7 @@ class MovimientoArticulo(models.Model):
     cantidad = models.IntegerField()
     fecha_movimiento = models.DateField(default=timezone.now)
     motivo = models.CharField(max_length=200, blank=True, null=True)
-
-    def __str__(self):
-        return f"Movimiento de {self.cantidad} de {self.articulo} desde {self.origen} a {self.destino}"
-
+#wa
 class RegistroHoras(models.Model):
     maquinaria = models.ForeignKey(Maquinaria, null=True, blank=True, on_delete=models.CASCADE)
     trabajador = models.ForeignKey(Trabajador, null=True, blank=True, on_delete=models.CASCADE)
@@ -198,3 +195,12 @@ class RegistroHoras(models.Model):
     horas_trabajadas = models.IntegerField()
     horas_esperadas = models.IntegerField(null=True, blank=True)
     fecha_registro = models.DateField()
+#retiro de articulo
+class RetiroArticulo(models.Model):
+    trabajador = models.ForeignKey(Trabajador, on_delete=models.CASCADE)
+    articulo = models.ForeignKey(ArticuloBodega, on_delete=models.RESTRICT)
+    cantidad = models.IntegerField()
+    fecha_retiro = models.DateField(default=timezone.now)
+    
+    def __str__(self):
+        return f"{self.trabajador} retiró {self.cantidad} de {self.articulo}"
