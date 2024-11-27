@@ -36,7 +36,7 @@ urlpatterns = [
 
     #Vista de inicio
     path('home/', views.index, name='home'),
-    path('descargar_informe/', views.generar_informe_pdf, name='generar_informe_pdf'),
+    path('descargar_informe_kpi/', views.generar_informe_pdf, name='generar_informe_pdf'),
 
     # Subida de archivo
     path('upload/', views.upload_csv, name='upload_file'),
@@ -56,16 +56,12 @@ urlpatterns = [
     path('panol/descargar_informe/', views.descargar_informe_pañol, name='descargar_informe_pañol'),
 
     #Vista de Trabajadores
-    path('trabajadores/', views.trabajadores_view, name='trabajadores'),
+    path('trabajadores/', views.trabajadores_view, name='gestion_trabajadores'),
     path('trabajadores/editar/<str:rut>/', views.editar_trabajador, name='editar_trabajador'),
-    path('trabajadores/eliminar/<str:rut>/', views.eliminar_trabajador, name='eliminar_trabajador'),
-
-    # Vista de certificaciones
-    path('trabajadores/agregar_certificacion/', views.agregar_certificacion, name='agregar_certificacion'),
-    path('certificaciones/eliminar/<int:id>/', views.eliminar_certificacion, name='eliminar_certificacion'),
-
-    #Descargar Trabajadores
+    path('trabajadores/eliminar/', views.eliminar_trabajador, name='eliminar_trabajador'),
+    path('trabajadores/agregar/', views.add_trabajador_view, name='add_trabajador'),
     path('trabajadores/descargar_informe/', views.descargar_informe_trabajadores, name='descargar_informe_trabajadores'),
+    path('trabajadores/eliminar_certificacion/<int:cert_id>/', views.eliminar_certificacion, name='eliminar_certificacion'),
 
     # Vista de Bodega
     path('bodega/', views.bodega_view, name='bodega'),

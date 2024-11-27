@@ -81,18 +81,18 @@ class Horario(models.Model):
 
 # Trabajador
 class Trabajador(models.Model):
-    rut = models.CharField(max_length=9, primary_key=True)
+    rut = models.CharField(max_length=100, primary_key=True)
     nombre_trabajador = models.CharField(max_length=256)
     area = models.ForeignKey(Area, on_delete=models.RESTRICT)
     cargo = models.ForeignKey(Cargo, on_delete=models.RESTRICT)
     jornada = models.ForeignKey(Jornada, on_delete=models.RESTRICT)
     turno = models.ForeignKey(Turno, on_delete=models.RESTRICT)
     horario = models.ForeignKey(Horario, on_delete=models.RESTRICT)
-    horas_esperadas_totales = models.IntegerField(default=40)
+    activo = models.BooleanField(default=True) 
 
     def __str__(self):
-        return self.nombre_trabajador
-
+        return f"{self.nombre_trabajador} ({self.rut})"
+    
 # Capacitacion
 class Capacitacion(models.Model):
     nombre_capacitacion = models.CharField(max_length=256)
@@ -100,6 +100,8 @@ class Capacitacion(models.Model):
 
     def __str__(self):
         return self.nombre_capacitacion
+
+    
 
 # CapacitacionTrabajador
 class CapacitacionTrabajador(models.Model):
@@ -187,14 +189,16 @@ class MovimientoArticulo(models.Model):
     cantidad = models.IntegerField()
     fecha_movimiento = models.DateField(default=timezone.now)
     motivo = models.CharField(max_length=200, blank=True, null=True)
-#wa
+    
+# Registro de horas
 class RegistroHoras(models.Model):
     maquinaria = models.ForeignKey(Maquinaria, null=True, blank=True, on_delete=models.CASCADE)
     trabajador = models.ForeignKey(Trabajador, null=True, blank=True, on_delete=models.CASCADE)
     area = models.ForeignKey(Area, on_delete=models.CASCADE)
     horas_trabajadas = models.IntegerField()
-    horas_esperadas = models.IntegerField(null=True, blank=True)
+    horas_esperadas = models.IntegerField(default=40)
     fecha_registro = models.DateField()
+
 #retiro de articulo
 class RetiroArticulo(models.Model):
     trabajador = models.ForeignKey(Trabajador, on_delete=models.CASCADE)

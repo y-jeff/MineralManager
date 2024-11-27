@@ -6,6 +6,9 @@ from .models import (
     MovimientoArticulo, RegistroHoras
 )
 
+
+
+
 # Registrar todos los modelos en el panel de administración
 admin.site.register(CustomUser)
 admin.site.register(Area)
