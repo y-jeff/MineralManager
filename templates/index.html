@@ -27,15 +27,14 @@
             font-weight: bold;
         }
         .kpi-value {
-            font-size: 2rem;
+            font-size: 2.5rem;
             font-weight: bold;
         }
-        .kpi-percentage {
+        .percentage {
             font-size: 1rem;
-            color: #28a745;
         }
-        .kpi-percentage-negative {
-            color: #dc3545;
+        .bg-purple {
+            background-color: #6a1b9a !important;
         }
     </style>
 </head>
@@ -80,53 +79,37 @@
         <div class="row">
             <div class="col-md-3">
                 <div class="kpi-card bg-success">
-                    <div class="kpi-title">Horas Esperadas (Trabajadores)</div>
+                    <h5>Horas Esperadas (Trabajadores)</h5>
                     <div class="kpi-value">{{ total_horas_esperadas_trabajadores }}</div>
+                    <div class="percentage">
+                        <small>(Progreso: {{ porcentaje_trabajadores }}%)</small>
+                    </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="kpi-card" style="background-color: #1e81b0;">
-                    <div class="kpi-title">Horas Trabajadas (Trabajadores)</div>
+                <div class="kpi-card bg-primary">
+                    <h5>Horas Trabajadas (Trabajadores)</h5>
                     <div class="kpi-value">{{ total_horas_trabajadas_trabajadores }}</div>
-                    <div class="kpi-percentage">
-                        {{ porcentaje_horas_trabajadas_trabajadores }}%
-                    </div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="kpi-card" style="background-color: #dfc63d;">
-                    <div class="kpi-title">Horas Esperadas (Maquinarias)</div>
+                <div class="kpi-card bg-warning">
+                    <h5>Horas Esperadas (Maquinarias)</h5>
                     <div class="kpi-value">{{ total_horas_esperadas_maquinarias }}</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-card" style="background-color: #7c5cb8;">
-                    <div class="kpi-title">Horas Trabajadas (Maquinarias)</div>
-                    <div class="kpi-value">{{ total_horas_trabajadas_maquinarias }}</div>
-                    <div class="kpi-percentage">
-                        {{ porcentaje_horas_trabajadas_maquinarias }}%
+                    <div class="percentage">
+                        <small>(Progreso: {{ porcentaje_maquinarias }}%)</small>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Movimientos y Retiros en Bodega -->
-        <div class="row">
-            <div class="col-md-6">
-                <div class="kpi-chart">
-                    <h5>Movimientos en Bodega</h5>
-                    <img src="data:image/png;base64,{{ chart_movimientos_bodega }}" alt="Movimientos en Bodega" class="img-fluid">
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="kpi-chart">
-                    <h5>Retiros en Bodega</h5>
-                    <img src="data:image/png;base64,{{ chart_retiros_bodega }}" alt="Retiros en Bodega" class="img-fluid">
+            <div class="col-md-3">
+                <div class="kpi-card bg-purple">
+                    <h5>Horas Trabajadas (Maquinarias)</h5>
+                    <div class="kpi-value text-light">{{ total_horas_trabajadas_maquinarias }}</div>
                 </div>
             </div>
         </div>
 
-        <!-- Gráficos de Trabajadores y Maquinarias -->
+        <!-- Charts -->
         <div class="row mt-4">
             <div class="col-md-6">
                 <div class="kpi-chart">
@@ -141,8 +124,23 @@
                 </div>
             </div>
         </div>
-    </div>
 
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="kpi-chart">
+                    <h5>Movimientos de Bodega a Pañol</h5>
+                    <img src="data:image/png;base64,{{ chart_movimientos_bodega }}" alt="Gráfico Movimientos Bodega" class="img-fluid">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="kpi-chart">
+                    <h5>Retiros en Pañol</h5>
+                    <img src="data:image/png;base64,{{ chart_retiros_pañol }}" alt="Gráfico Retiros Pañol" class="img-fluid">
+                </div>
+            </div>            
+        </div>
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

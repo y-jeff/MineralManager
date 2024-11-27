@@ -63,117 +63,91 @@ def login_signup_view(request):
 
 @login_required
 def index(request):
-    # Datos de trabajadores por área
-    trabajadores_data = (
-        RegistroHoras.objects.filter(trabajador__isnull=False)
-        .values("area__nombre_area")
-        .annotate(
-            horas_trabajadas=Sum("horas_trabajadas"),
-            horas_esperadas=Sum("horas_esperadas"),
-        )
+    # Datos de trabajadores
+    total_horas_esperadas_trabajadores = RegistroHoras.objects.filter(trabajador__isnull=False).aggregate(Sum('horas_esperadas'))['horas_esperadas__sum'] or 0
+    total_horas_trabajadas_trabajadores = RegistroHoras.objects.filter(trabajador__isnull=False).aggregate(Sum('horas_trabajadas'))['horas_trabajadas__sum'] or 0
+
+    porcentaje_trabajadores = (
+        (total_horas_trabajadas_trabajadores / total_horas_esperadas_trabajadores) * 100
+        if total_horas_esperadas_trabajadores > 0 else 0
     )
 
-    # Datos de maquinarias por área
-    maquinarias_data = (
-        RegistroHoras.objects.filter(maquinaria__isnull=False)
-        .values("area__nombre_area")
-        .annotate(
-            horas_trabajadas=Sum("horas_trabajadas"),
-            horas_esperadas=Sum("horas_esperadas"),
-        )
+    # Datos de maquinarias
+    total_horas_esperadas_maquinarias = RegistroHoras.objects.filter(maquinaria__isnull=False).aggregate(Sum('horas_esperadas'))['horas_esperadas__sum'] or 0
+    total_horas_trabajadas_maquinarias = RegistroHoras.objects.filter(maquinaria__isnull=False).aggregate(Sum('horas_trabajadas'))['horas_trabajadas__sum'] or 0
+
+    porcentaje_maquinarias = (
+        (total_horas_trabajadas_maquinarias / total_horas_esperadas_maquinarias) * 100
+        if total_horas_esperadas_maquinarias > 0 else 0
     )
 
-    # Cálculo de totales y porcentajes
-    total_horas_esperadas_trabajadores = (
-        RegistroHoras.objects.filter(trabajador__isnull=False)
-        .aggregate(Sum("horas_esperadas"))["horas_esperadas__sum"]
-        or 0
-    )
-    total_horas_trabajadas_trabajadores = (
-        RegistroHoras.objects.filter(trabajador__isnull=False)
-        .aggregate(Sum("horas_trabajadas"))["horas_trabajadas__sum"]
-        or 0
-    )
-    porcentaje_horas_trabajadas_trabajadores = (
-        round(
-            (total_horas_trabajadas_trabajadores / total_horas_esperadas_trabajadores) * 100,
-            2,
-        )
-        if total_horas_esperadas_trabajadores > 0
-        else 0
+    # Movimientos en bodega
+    movimientos_bodega_data = MovimientoArticulo.objects.values('origen__nombre_bodega').annotate(
+        total_movimientos=Sum('cantidad')
     )
 
-    total_horas_esperadas_maquinarias = (
-        RegistroHoras.objects.filter(maquinaria__isnull=False)
-        .aggregate(Sum("horas_esperadas"))["horas_esperadas__sum"]
-        or 0
-    )
-    total_horas_trabajadas_maquinarias = (
-        RegistroHoras.objects.filter(maquinaria__isnull=False)
-        .aggregate(Sum("horas_trabajadas"))["horas_trabajadas__sum"]
-        or 0
-    )
-    porcentaje_horas_trabajadas_maquinarias = (
-        round(
-            (total_horas_trabajadas_maquinarias / total_horas_esperadas_maquinarias) * 100,
-            2,
-        )
-        if total_horas_esperadas_maquinarias > 0
-        else 0
-    )
-
-    # Movimientos y retiros en bodega
-    total_movimientos_bodega = MovimientoArticulo.objects.count()
-    total_retiros_bodega = RetiroArticulo.objects.count()
-
-    # Generación de gráficos
+    # Gráficos
     chart_trabajadores = generar_grafico_horas(
-        trabajadores_data, "Horas Trabajadas por Área (Trabajadores)"
+        RegistroHoras.objects.filter(trabajador__isnull=False).values('area__nombre_area').annotate(
+            horas_trabajadas=Sum('horas_trabajadas'),
+            horas_esperadas=Sum('horas_esperadas'),
+        ),
+        "Horas Trabajadas por Área (Trabajadores)"
     )
+
     chart_maquinarias = generar_grafico_horas(
-        maquinarias_data, "Horas Trabajadas por Área (Maquinarias)"
+        RegistroHoras.objects.filter(maquinaria__isnull=False).values('area__nombre_area').annotate(
+            horas_trabajadas=Sum('horas_trabajadas'),
+            horas_esperadas=Sum('horas_esperadas'),
+        ),
+        "Horas Trabajadas por Área (Maquinarias)"
     )
+
     chart_movimientos_bodega = generar_grafico_barras_simple(
-        MovimientoArticulo.objects.values("origen__nombre_bodega")
-        .annotate(total=Count("id"))
-        .order_by("-total"),
+        movimientos_bodega_data,
         "Movimientos en Bodega",
-        "Bodega",
-        "Total",
+        "origen__nombre_bodega",
+        "total_movimientos"
     )
-    chart_retiros_bodega = generar_grafico_barras_simple(
+
+    # Datos para retiros en el pañol
+    retiros_pañol_data = (
         RetiroArticulo.objects.values("articulo__nombre_articulo")
-        .annotate(total=Count("id"))
-        .order_by("-total"),
-        "Retiros en Bodega",
-        "Artículo",
-        "Total",
+        .annotate(total_cantidad=Sum("cantidad"))
+    )
+
+    # Generar gráfico para retiros en el pañol
+    chart_retiros_pañol = generar_grafico_barras_simple(
+        data=retiros_pañol_data,
+        label_name="articulo__nombre_articulo",
+        value_name="total_cantidad",
+        color="blue"
     )
 
     context = {
         "total_horas_esperadas_trabajadores": total_horas_esperadas_trabajadores,
         "total_horas_trabajadas_trabajadores": total_horas_trabajadas_trabajadores,
-        "porcentaje_horas_trabajadas_trabajadores": porcentaje_horas_trabajadas_trabajadores,
+        "porcentaje_trabajadores": round(porcentaje_trabajadores, 2),
+
         "total_horas_esperadas_maquinarias": total_horas_esperadas_maquinarias,
         "total_horas_trabajadas_maquinarias": total_horas_trabajadas_maquinarias,
-        "porcentaje_horas_trabajadas_maquinarias": porcentaje_horas_trabajadas_maquinarias,
-        "total_movimientos_bodega": total_movimientos_bodega,
-        "total_retiros_bodega": total_retiros_bodega,
+        "porcentaje_maquinarias": round(porcentaje_maquinarias, 2),
+
         "chart_trabajadores": chart_trabajadores,
         "chart_maquinarias": chart_maquinarias,
         "chart_movimientos_bodega": chart_movimientos_bodega,
-        "chart_retiros_bodega": chart_retiros_bodega,
+        "chart_retiros_pañol": chart_retiros_pañol,
     }
 
     return render(request, "index.html", context)
 
 
-def generar_grafico_horas(data, titulo):
-    """Genera un gráfico de barras comparando horas esperadas y trabajadas."""
-    import matplotlib.pyplot as plt
-    import io
-    import base64
 
+# Función para gráficos de horas
+def generar_grafico_horas(data, titulo, color1="blue", color2="green"):
+    """
+    Genera un gráfico de barras para comparar horas esperadas y trabajadas.
+    """
     if not data:
         return ""
 
@@ -182,34 +156,41 @@ def generar_grafico_horas(data, titulo):
     horas_trabajadas = [d["horas_trabajadas"] for d in data]
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(areas, horas_esperadas, label="Horas Esperadas", color="orange")
-    ax.bar(areas, horas_trabajadas, label="Horas Trabajadas", color="blue", alpha=0.7)
+    ax.bar(areas, horas_esperadas, label="Horas Esperadas", color=color1)
+    ax.bar(areas, horas_trabajadas, label="Horas Trabajadas", color=color2, alpha=0.7)
     ax.set_title(titulo)
     ax.set_ylabel("Horas")
+    ax.set_xticks(range(len(areas)))
+    ax.set_xticklabels(areas, rotation=45, ha="right")
     ax.legend()
-    plt.xticks(rotation=45)
+    plt.tight_layout()
 
     buffer = io.BytesIO()
     plt.savefig(buffer, format="png")
     buffer.seek(0)
     image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
     buffer.close()
-
     return image_base64
 
-
-def generar_grafico_barras_simple(data, titulo, label_name, value_name, color="blue"):
+# Función para gráficos simples de barras
+def generar_grafico_barras_simple(data, titulo, label_name, value_name):
     """
-    Genera un gráfico de barras simple.
+    Genera un gráfico de barras simple basado en datos con etiquetas y valores.
     """
     if not data:
         return ""
 
-    labels = [d[label_name] for d in data]
-    values = [d[value_name] for d in data]
+    try:
+        labels = [d[label_name] for d in data]
+        values = [d[value_name] for d in data]
+    except KeyError as e:
+        raise KeyError(
+            f"La clave '{e.args[0]}' no existe en los datos proporcionados. "
+            f"Datos disponibles: {list(data[0].keys()) if data else 'No hay datos'}"
+        )
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(labels, values, color=color)
+    ax.bar(labels, values, color="skyblue")
     ax.set_title(titulo)
     ax.set_ylabel("Cantidad")
     ax.set_xticks(range(len(labels)))
@@ -222,6 +203,7 @@ def generar_grafico_barras_simple(data, titulo, label_name, value_name, color="b
     image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
     buffer.close()
     return image_base64
+
 
 
 def generar_informe_pdf(request):
