@@ -61,6 +61,17 @@ def login_signup_view(request):
 
 # Página Principal
 
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+from django.db.models import Sum
+import matplotlib.pyplot as plt
+import io
+import base64
+from reportlab.pdfgen import canvas
+from .models import RegistroHoras, MovimientoArticulo, RetiroArticulo
+
+
 @login_required
 def index(request):
     # Datos de trabajadores
@@ -86,6 +97,12 @@ def index(request):
         total_movimientos=Sum('cantidad')
     )
 
+    # Retiros en pañol
+    retiros_pañol_data = (
+        RetiroArticulo.objects.values("articulo__nombre_articulo")
+        .annotate(total_cantidad=Sum("cantidad"))
+    )
+
     # Gráficos
     chart_trabajadores = generar_grafico_horas(
         RegistroHoras.objects.filter(trabajador__isnull=False).values('area__nombre_area').annotate(
@@ -104,24 +121,19 @@ def index(request):
     )
 
     chart_movimientos_bodega = generar_grafico_barras_simple(
-        movimientos_bodega_data,
-        "Movimientos en Bodega",
-        "origen__nombre_bodega",
-        "total_movimientos"
+        data=movimientos_bodega_data,
+        label_name="origen__nombre_bodega",
+        value_name="total_movimientos",
+        title="Movimientos de Bodega a Pañol",
+        color="blue"
     )
 
-    # Datos para retiros en el pañol
-    retiros_pañol_data = (
-        RetiroArticulo.objects.values("articulo__nombre_articulo")
-        .annotate(total_cantidad=Sum("cantidad"))
-    )
-
-    # Generar gráfico para retiros en el pañol
     chart_retiros_pañol = generar_grafico_barras_simple(
         data=retiros_pañol_data,
         label_name="articulo__nombre_articulo",
         value_name="total_cantidad",
-        color="blue"
+        title="Retiros en Pañol",
+        color="green"
     )
 
     context = {
@@ -142,12 +154,8 @@ def index(request):
     return render(request, "index.html", context)
 
 
-
 # Función para gráficos de horas
 def generar_grafico_horas(data, titulo, color1="blue", color2="green"):
-    """
-    Genera un gráfico de barras para comparar horas esperadas y trabajadas.
-    """
     if not data:
         return ""
 
@@ -172,52 +180,45 @@ def generar_grafico_horas(data, titulo, color1="blue", color2="green"):
     buffer.close()
     return image_base64
 
+
 # Función para gráficos simples de barras
-def generar_grafico_barras_simple(data, titulo, label_name, value_name):
-    """
-    Genera un gráfico de barras simple basado en datos con etiquetas y valores.
-    """
-    if not data:
-        return ""
+def generar_grafico_barras_simple(data, label_name, value_name, title=None, color='blue'):
+    labels = [d.get(label_name, 'Desconocido') for d in data]
+    values = [d.get(value_name, 0) for d in data]
 
-    try:
-        labels = [d[label_name] for d in data]
-        values = [d[value_name] for d in data]
-    except KeyError as e:
-        raise KeyError(
-            f"La clave '{e.args[0]}' no existe en los datos proporcionados. "
-            f"Datos disponibles: {list(data[0].keys()) if data else 'No hay datos'}"
-        )
+    fig, ax = plt.subplots()
+    ax.bar(labels, values, color=color)
+    ax.set_xlabel(label_name)
+    ax.set_ylabel(value_name)
+    if title:
+        ax.set_title(title)
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(labels, values, color="skyblue")
-    ax.set_title(titulo)
-    ax.set_ylabel("Cantidad")
-    ax.set_xticks(range(len(labels)))
-    ax.set_xticklabels(labels, rotation=45, ha="right")
-    plt.tight_layout()
+    plt.xticks(rotation=45, ha='right')
 
     buffer = io.BytesIO()
-    plt.savefig(buffer, format="png")
+    plt.savefig(buffer, format='png', bbox_inches='tight')
     buffer.seek(0)
-    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    image_png = buffer.getvalue()
     buffer.close()
+
+    image_base64 = base64.b64encode(image_png).decode('utf-8')
+    plt.close(fig)
+
     return image_base64
 
 
-
+# Función para generar un informe PDF
 def generar_informe_pdf(request):
-    # Crear un archivo PDF en memoria
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'inline; filename="informe.pdf"'
 
-    # Generar contenido del PDF
     p = canvas.Canvas(response)
     p.drawString(100, 750, "Informe generado desde Mineral Manager")
     p.showPage()
     p.save()
 
     return response
+
 
 
 #Vistas para subir archivo
