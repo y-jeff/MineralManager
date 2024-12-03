@@ -1,40 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard KPI</title>
+    <title>Panel Principal</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <style>
         body {
             background-color: #f8f9fa;
         }
-        .kpi-card {
-            border-radius: 10px;
+        .metric-box {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
             padding: 20px;
-            margin: 15px;
-            text-align: center;
-            color: #fff;
+            margin: 15px 0;
+            background-color: #ffffff;
+            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
         }
-        .kpi-chart {
-            background-color: #fff;
-            border-radius: 10px;
-            padding: 15px;
-            box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        .kpi-title {
+        .metric-title {
             font-size: 1.2rem;
             font-weight: bold;
+            color: #495057;
         }
-        .kpi-value {
-            font-size: 2.5rem;
+        .metric-value {
+            font-size: 2rem;
             font-weight: bold;
-        }
-        .percentage {
-            font-size: 1rem;
-        }
-        .bg-purple {
-            background-color: #6a1b9a !important;
+            color: #343a40;
         }
     </style>
 </head>
@@ -48,99 +39,107 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarCollapse">
                     <div class="navbar-nav mx-lg-auto">
-                        <a class="nav-item nav-link active" href="/home">Home</a>
+                        <a class="nav-item nav-link active " href="/home">Home</a>
                         <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
                         <a class="nav-item nav-link" href="/maquinaria">Maquinaria</a>
                         <a class="nav-item nav-link" href="/pañol">Pañol</a>
                         <a class="nav-item nav-link" href="/bodega">Bodega</a>
                         <a class="nav-item nav-link" href="/retiro">Retiro de Artículo</a>
+                        <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
                         <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
                     </div>
                 </div>
-                <div class="dropdown">
-                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        {{ request.user.username }}
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                        <li class="dropdown-header">
-                            <strong>{{ request.user.username }}</strong><br>
-                            <small>{{ request.user.email }}</small>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
-                    </ul>
-                </div>
             </div>
+                     <!-- Dropdown de usuario -->
+                     <style>
+                        .dropdown-item.text-danger:hover {
+                          color: white !important;
+                          background-color: red !important;
+                        }
+                      </style>
+                     <div class="dropdown">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            {{ request.user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li class="dropdown-header">
+                                <strong>{{ request.user.username }}</strong><br>
+                                <small>{{ request.user.email }}</small>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+                        </ul>
+                    </div>
         </nav>
-    </header>
-
-    <div class="container my-4">
-        <!-- KPI Cards -->
-        <div class="row">
-            <div class="col-md-3">
-                <div class="kpi-card bg-success">
-                    <h5>Horas Esperadas (Trabajadores)</h5>
-                    <div class="kpi-value">{{ total_horas_esperadas_trabajadores }}</div>
-                    <div class="percentage">
-                        <small>(Progreso: {{ porcentaje_trabajadores }}%)</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-card bg-primary">
-                    <h5>Horas Trabajadas (Trabajadores)</h5>
-                    <div class="kpi-value">{{ total_horas_trabajadas_trabajadores }}</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-card bg-warning">
-                    <h5>Horas Esperadas (Maquinarias)</h5>
-                    <div class="kpi-value">{{ total_horas_esperadas_maquinarias }}</div>
-                    <div class="percentage">
-                        <small>(Progreso: {{ porcentaje_maquinarias }}%)</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="kpi-card bg-purple">
-                    <h5>Horas Trabajadas (Maquinarias)</h5>
-                    <div class="kpi-value text-light">{{ total_horas_trabajadas_maquinarias }}</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts -->
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="kpi-chart">
-                    <h5>Horas Trabajadas por Área (Trabajadores)</h5>
-                    <img src="data:image/png;base64,{{ chart_trabajadores }}" alt="Gráfico Trabajadores" class="img-fluid">
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="kpi-chart">
-                    <h5>Horas Trabajadas por Área (Maquinarias)</h5>
-                    <img src="data:image/png;base64,{{ chart_maquinarias }}" alt="Gráfico Maquinarias" class="img-fluid">
-                </div>
-            </div>
-        </div>
-
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="kpi-chart">
-                    <h5>Movimientos de Bodega a Pañol</h5>
-                    <img src="data:image/png;base64,{{ chart_movimientos_bodega }}" alt="Gráfico Movimientos Bodega" class="img-fluid">
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="kpi-chart">
-                    <h5>Retiros en Pañol</h5>
-                    <img src="data:image/png;base64,{{ chart_retiros_pañol }}" alt="Gráfico Retiros Pañol" class="img-fluid">
-                </div>
-            </div>            
-        </div>
-    </div>
+    </header>    
+    {% block content %}
+    <div class="container mt-5">
+        <h2 class="mb-4">Panel Principal</h2>
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- KPIs -->
+        <div class="row mb-5">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Trabajadores Activos</h5>
+                        <p class="display-6">{{ total_trabajadores }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Certificaciones Próximas a Expirar</h5>
+                        <p class="display-6">{{ certificaciones_data|length }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Maquinaria en Mantenimiento</h5>
+                        <p class="display-6">{{ maquinaria_en_mantenimiento }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title">Maquinaria Inactiva</h5>
+                        <p class="display-6">{{ maquinaria_inactiva }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+           <!-- Tabla de certificaciones próximas a expirar -->
+        <h3>Certificaciones Próximas a Expirar</h3>
+        <table class="table table-striped table-bordered mt-3">
+            <thead class="table-dark">
+                <tr>
+                    <th>Trabajador</th>
+                    <th>Certificación</th>
+                    <th>Fecha de Expiración</th>
+                    <th>Días Restantes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cert in certificaciones_data %}
+                <tr>
+                    <td>{{ cert.trabajador.nombre_trabajador }}</td>
+                    <td>{{ cert.capacitacion.nombre_capacitacion }}</td>
+                    <td>{{ cert.fecha_fin|date:"d-m-Y" }}</td>
+                    <td>{{ cert.dias_restantes }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center">No hay certificaciones próximas a expirar.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endblock %}
+    
 </body>
 </html>

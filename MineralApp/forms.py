@@ -113,8 +113,21 @@ class MovimientoArticuloForm(forms.ModelForm):
             'fecha_movimiento': forms.HiddenInput(),  # Se puede manejar automáticamente
         }
 
-#formulario de retiro
 class RetiroArticuloForm(forms.ModelForm):
     class Meta:
         model = RetiroArticulo
         fields = ['trabajador', 'articulo', 'cantidad']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Configurar el queryset y opciones iniciales
+        self.fields['trabajador'].queryset = Trabajador.objects.filter(activo=True)
+        self.fields['trabajador'].empty_label = "Seleccione un trabajador"
+        self.fields['articulo'].queryset = ArticuloPanol.objects.all()
+        self.fields['articulo'].empty_label = "Seleccione un artículo"
+
+        # Configurar widgets para mejorar la apariencia y funcionalidad
+        self.fields['trabajador'].widget.attrs.update({'class': 'form-select'})
+        self.fields['articulo'].widget.attrs.update({'class': 'form-select'})
+        self.fields['cantidad'].widget.attrs.update({'class': 'form-control', 'min': 1})

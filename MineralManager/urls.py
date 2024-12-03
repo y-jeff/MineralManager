@@ -36,7 +36,6 @@ urlpatterns = [
 
     #Vista de inicio
     path('home/', views.index, name='home'),
-    path('descargar_informe_kpi/', views.generar_informe_pdf, name='generar_informe_pdf'),
 
     # Subida de archivo
     path('upload/', views.upload_csv, name='upload_file'),
@@ -71,8 +70,12 @@ urlpatterns = [
     path("articulobodega/", views.articulo_bodega_view, name="articulo_bodega"),
 
     #vista maquinaria
-    path('maquinaria',views.maquinaria, name='maquinaria'),
+    path('maquinaria/', views.maquinaria_view, name='maquinaria'),
+    path('maquinaria/add/', views.add_maquinaria, name='add_maquinaria'),
+    path('maquinaria/edit/<int:maquinaria_id>/', views.edit_maquinaria, name='edit_maquinaria'),
+    path('maquinaria/delete/<int:maquinaria_id>/', views.delete_maquinaria, name='delete_maquinaria'),
 
     #vista retiro
     path('retiro/', views.retiro_articulo_view, name='retiro_articulo'),
+
 ]

@@ -1,165 +1,244 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     {% load static %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Maquinaria - Mineral Manager</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
-    <link href="{% static 'CSS/index_style.css' %}" rel="stylesheet" />
-    <link href="{% static 'CSS/logout_style.css' %}" rel="stylesheet" />
-    <link href="{% static 'CSS/download_style.css' %}" rel="stylesheet" />
+    <title>Gestión de Maquinaria</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<header>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
-        <div class="container-xl">
-            <a class="navbar-brand" href="/home"><h4>Mineral Manager</h4></a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarCollapse">
-                <div class="navbar-nav mx-lg-auto">
-                    <a class="nav-item nav-link" href="/home">Home</a>
-                    <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
-                    <a class="nav-item nav-link active" href="/maquinaria">Maquinaria</a>
-                    <a class="nav-item nav-link" href="/pañol">Pañol</a>
-                    <a class="nav-item nav-link" href="/bodega">Bodega</a>
-                    <a class="nav-item nav-link" href="/retiro">Retiro de Artículo</a>
-                    <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
-                    <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark px-0 py-3">
+            <div class="container-xl">
+                <a class="navbar-brand" href="/home"><h4>Mineral Manager</h4></a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarCollapse">
+                    <div class="navbar-nav mx-lg-auto">
+                        <a class="nav-item nav-link" href="/home">Home</a>
+                        <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
+                        <a class="nav-item nav-link active" href="/maquinaria">Maquinaria</a>
+                        <a class="nav-item nav-link" href="/pañol">Pañol</a>
+                        <a class="nav-item nav-link" href="/bodega">Bodega</a>
+                        <a class="nav-item nav-link" href="/retiro">Retiro de Artículo</a>
+                        <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
+                        <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
+                    </div>
+                </div>
+            </div>
+                 <!-- Dropdown de usuario -->
+                 <style>
+                    .dropdown-item.text-danger:hover {
+                      color: white !important;
+                      background-color: red !important;
+                    }
+                  </style>
+                 <div class="dropdown">
+                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        {{ request.user.username }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li class="dropdown-header">
+                            <strong>{{ request.user.username }}</strong><br>
+                            <small>{{ request.user.email }}</small>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+                    </ul>
+                </div>
+        </nav>
+    </header>
+    {% block content %}
+    <div class="container mt-5">
+        <h1 class="mb-4">Gestión de Maquinarias</h1>
+
+        <form method="get" class="d-flex mb-3">
+            <input type="text" name="search" class="form-control me-2" placeholder="Buscar por nombre, área o estado" value="{{ search_query }}">
+            <select name="estado" class="form-select me-2">
+                <option value="">Todos los estados</option>
+                {% for key, value in estados.items %}
+                <option value="{{ key }}" {% if key == selected_estado %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+            </select>
+            <select name="area" class="form-select me-2">
+                <option value="">Todas las áreas</option>
+                {% for area in areas %}
+                <option value="{{ area.id }}" {% if area.id|stringformat:"s" == selected_area %}selected{% endif %}>{{ area.nombre_area }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </form>
+        
+        
+        <div class="d-flex justify-content-between mb-3">
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addMaquinariaModal">Agregar Maquinaria</button>
+        </div>
+        
+        <!-- Tabla de Maquinarias -->
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Nombre</th>
+                        <th>Código</th>
+                        <th>Estado</th>
+                        <th>Fecha de Adquisición</th>
+                        <th>Área</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in maquinarias %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ item.nombre_maquinaria }}</td>
+                        <td>{{ item.codigo_maquinaria }}</td>
+                        <td>{{ item.get_estado_display }}</td>
+                        <td>{{ item.fecha_adquisicion }}</td>
+                        <td>{{ item.area.nombre_area }}</td>
+                        <td>
+                            <!-- Botón Editar -->
+                            <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#editMaquinariaModal{{ item.id }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: rgba(0, 0, 0, 1);transform: ;msFilter:;"><path d="m18.988 2.012 3 3L19.701 7.3l-3-3zM8 16h3l7.287-7.287-3-3L8 13z"></path><path d="M19 19H8.158c-.026 0-.053.01-.079.01-.033 0-.066-.009-.1-.01H5V5h6.847l2-2H5c-1.103 0-2 .896-2 2v14c0 1.104.897 2 2 2h14a2 2 0 0 0 2-2v-8.668l-2 2V19z"></path></svg>
+                            </button>
+    
+                            <!-- Botón Eliminar -->
+                            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteMaquinariaModal{{ item.id }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: rgba(0, 0, 0, 1);transform: ;msFilter:;"><path d="M5 20a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8h2V6h-4V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H3v2h2zM9 4h6v2H9zM8 8h9v12H7V8z"></path><path d="M9 10h2v8H9zm4 0h2v8h-2z"></path></svg>
+                            </button>
+                        </td>
+                    </tr>
+    
+                    <!-- Modal para Editar Maquinaria -->
+                    <div class="modal fade" id="editMaquinariaModal{{ item.id }}" tabindex="-1" aria-labelledby="editMaquinariaModalLabel{{ item.id }}" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post" action="{% url 'edit_maquinaria' item.id %}">
+                                    {% csrf_token %}
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="editMaquinariaModalLabel{{ item.id }}">Editar Maquinaria</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label for="nombre_maquinaria" class="form-label">Nombre</label>
+                                            <input type="text" class="form-control" id="nombre_maquinaria" name="nombre_maquinaria" value="{{ item.nombre_maquinaria }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="codigo_maquinaria" class="form-label">Código</label>
+                                            <input type="text" class="form-control" id="codigo_maquinaria" name="codigo_maquinaria" value="{{ item.codigo_maquinaria }}" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="estado" class="form-label">Estado</label>
+                                            <select class="form-select" id="estado" name="estado" required>
+                                                {% for key, value in item.ESTADOS %}
+                                                <option value="{{ key }}" {% if item.estado == key %}selected{% endif %}>{{ value }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="fecha_adquisicion" class="form-label">Fecha de Adquisición</label>
+                                            <input type="text" class="form-control" id="fecha_adquisicion" name="fecha_adquisicion" value="{{ item.fecha_adquisicion|date:'d-m-Y' }}" readonly>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="area" class="form-label">Área</label>
+                                            <select class="form-select" id="area" name="area" required>
+                                                {% for area in areas %}
+                                                <option value="{{ area.id }}" {% if item.area.id == area.id %}selected{% endif %}>{{ area.nombre_area }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary">Guardar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+    
+                    <!-- Modal para Eliminar Maquinaria -->
+                    <div class="modal fade" id="deleteMaquinariaModal{{ item.id }}" tabindex="-1" aria-labelledby="deleteMaquinariaModalLabel{{ item.id }}" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="post" action="{% url 'delete_maquinaria' item.id %}">
+                                    {% csrf_token %}
+                                    <div class="modal-header">
+                                        <h5 class="modal-title" id="deleteMaquinariaModalLabel{{ item.id }}">Eliminar Maquinaria</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p>¿Estás seguro de que deseas eliminar la maquinaria <strong>{{ item.nombre_maquinaria }}</strong>?</p>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-danger">Eliminar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    
+        <!-- Modal para agregar maquinaria -->
+        <div class="modal fade" id="addMaquinariaModal" tabindex="-1" aria-labelledby="addMaquinariaModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <form method="post" action="{% url 'add_maquinaria' %}">
+                        {% csrf_token %}
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="addMaquinariaModalLabel">Agregar Maquinaria</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="nombre_maquinaria" class="form-label">Nombre</label>
+                                <input type="text" class="form-control" id="nombre_maquinaria" name="nombre_maquinaria" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="codigo_maquinaria" class="form-label">Código</label>
+                                <input type="text" class="form-control" id="codigo_maquinaria" name="codigo_maquinaria" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="fecha_adquisicion" class="form-label">Fecha de Adquisición</label>
+                                <input type="date" class="form-control" id="fecha_adquisicion" name="fecha_adquisicion" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="area" class="form-label">Área</label>
+                                <select class="form-select" id="area" name="area" required>
+                                    {% for area in areas %}
+                                    <option value="{{ area.id }}">{{ area.nombre_area }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="estado" class="form-label">Estado</label>
+                                <select class="form-select" id="estado" name="estado" required>
+                                    {% for key, value in estados.items %}
+                                    <option value="{{ key }}">{{ value }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="submit" class="btn btn-primary">Guardar</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
-        <div class="dropdown">
-            <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                {{ request.user.username }}
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                <li class="dropdown-header">
-                    <strong>{{ request.user.username }}</strong><br>
-                    <small>{{ request.user.email }}</small>
-                </li>
-                <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
-            </ul>
-        </div>
-    </nav>
-</header>
-<body>
-    <main class="container mt-5">
-        <h1>Maquinaria</h1>
+</div>
+    </div>
+    {% endblock %}
+     
 
-        <!-- Warning for low stock -->
-        {% if advertencias %}
-        <div class="alert alert-warning">
-            <strong>Advertencia:</strong> Hay maquinarias pendientes de mantenimiento.
-        </div>
-        {% endif %}
-
-        <!-- Table of inventory -->
-        <table class="table table-bordered table-striped">
-            <thead class="table-dark">
-                <tr>
-                    <th>#</th>
-                    <th>Nombre Maquinaria</th>
-                    <th>Código</th>
-                    <th>Fecha de Adquisición</th>
-                    <th>Estado</th>
-                    <th>Área</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for maquinaria in maquinarias %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ maquinaria.nombre_maquinaria }}</td>
-                    <td>{{ maquinaria.codigo_maquinaria }}</td>
-                    <td>{{ maquinaria.fecha_adquisicion }}</td>
-                    <td>{{ maquinaria.estado }}</td>
-                    <td>{{ maquinaria.area }}</td>
-                    <td>
-                        <!-- Actions for edit and delete -->
-                        <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#editModal{{ articulo.id }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: rgba(0, 0, 0, 1);transform: ;msFilter:;"><path d="m18.988 2.012 3 3L19.701 7.3l-3-3zM8 16h3l7.287-7.287-3-3L8 13z"></path><path d="M19 19H8.158c-.026 0-.053.01-.079.01-.033 0-.066-.009-.1-.01H5V5h6.847l2-2H5c-1.103 0-2 .896-2 2v14c0 1.104.897 2 2 2h14a2 2 0 0 0 2-2v-8.668l-2 2V19z"></path></svg>
-                        </button>
-                        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ articulo.id }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" style="fill: rgba(0, 0, 0, 1);transform: ;msFilter:;"><path d="M5 20a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8h2V6h-4V4a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2H3v2h2zM9 4h6v2H9zM8 8h9v12H7V8z"></path><path d="M9 10h2v8H9zm4 0h2v8h-2z"></path></svg>
-                        </button>
-                    </td>
-                </tr>
-
-                <!-- Modal for editing -->
-                <div class="modal fade" id="editModal{{ maquinaria.id }}" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <form method="POST" action="?editar_id={{ maquinaria.id }}">
-                                {% csrf_token %}
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Editar Maquinaria</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="mb-3">
-                                        <label for="nombre_maquinaria" class="form-label">Nombre Maquinaria</label>
-                                        <input type="text" class="form-control" name="nombre_maquinaria" value="{{ maquinaria.nombre_maquinaria }}" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="codigo_maquinaria" class="form-label">Código</label>
-                                        <input type="text" class="form-control" name="codigo_maquinaria" value="{{ maquinaria.codigo_maquinaria }}" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="fecha_adquisicion" class="form-label">Fecha de Adquisición</label>
-                                        <input type="date" class="form-control" name="fecha_adquisicion" value="{{ maquinaria.fecha_adquisicion|date:'Y-m-d' }}" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="estado" class="form-label">Estado</label>
-                                        <input type="text" class="form-control" name="estado" value="{{ maquinaria.estado }}" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="area" class="form-label">Área</label>
-                                        <select class="form-select" name="area" required>
-                                            {% for area in areas %}
-                                                <option value="{{ area.id }}" {% if area.id == maquinaria.area.id %}selected{% endif %}>{{ area.nombre_area }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Modal for deletion -->
-                <div class="modal fade" id="deleteModal{{ maquinaria.id }}" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <form method="POST" action="?eliminar_id={{ maquinaria.id }}">
-                                {% csrf_token %}
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Eliminar Maquinaria</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <p>¿Estás seguro de que deseas eliminar la maquinaria "{{ maquinaria.nombre_maquinaria }}"?</p>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                                    <button type="submit" class="btn btn-danger">Eliminar</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </tbody>
-        </table>
-    </main>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

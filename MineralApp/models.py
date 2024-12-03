@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.core.exceptions import ValidationError
+
 
 # Custom user manager
 class CustomUserManager(BaseUserManager):
@@ -110,8 +112,15 @@ class CapacitacionTrabajador(models.Model):
     fecha_inicio = models.DateField(default=timezone.now)
     fecha_fin = models.DateField(null=True, blank=True)  # Opcional
 
-    def __str__(self):
-        return f"{self.capacitacion} - {self.trabajador}"
+    def clean(self):
+        # Asegúrate de que `fecha_fin` sea nula si no es renovable
+        if not self.capacitacion.es_renovable and self.fecha_fin:
+            raise ValidationError("Las capacitaciones no renovables no deben tener fecha de finalización.")
+
+    def save(self, *args, **kwargs):
+        # Llama a la validación antes de guardar
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 # Panol
 class Panol(models.Model):
@@ -161,15 +170,20 @@ class ArticuloBodega(models.Model):
 
 # Maquinaria
 class Maquinaria(models.Model):
+    ESTADOS = [
+        ('activo', 'Activo'),
+        ('mantenimiento', 'En Mantenimiento'),
+        ('inactivo', 'Inactivo'),
+    ]
+
+    nombre_maquinaria = models.CharField(max_length=255)
     codigo_maquinaria = models.CharField(max_length=100, unique=True)
-    nombre_maquinaria = models.CharField(max_length=100)
+    estado = models.CharField(max_length=20, choices=ESTADOS, default='activo')
     fecha_adquisicion = models.DateField()
-    estado = models.CharField(max_length=50)
-    area = models.ForeignKey(Area, on_delete=models.RESTRICT)
-    horas_esperadas = models.PositiveIntegerField(default=0)
+    area = models.ForeignKey('Area', on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
-        return f"{self.nombre_maquinaria} ({self.codigo_maquinaria})"
+        return self.nombre_maquinaria
 
 # Mantenimiento Maquinaria
 class MantenimientoMaquinaria(models.Model):
@@ -202,9 +216,9 @@ class RegistroHoras(models.Model):
 #retiro de articulo
 class RetiroArticulo(models.Model):
     trabajador = models.ForeignKey(Trabajador, on_delete=models.CASCADE)
-    articulo = models.ForeignKey(ArticuloBodega, on_delete=models.RESTRICT)
-    cantidad = models.IntegerField()
-    fecha_retiro = models.DateField(default=timezone.now)
-    
+    articulo = models.ForeignKey(ArticuloPanol, on_delete=models.CASCADE)
+    cantidad = models.PositiveIntegerField()
+    fecha_retiro = models.DateField(auto_now_add=True)
+
     def __str__(self):
-        return f"{self.trabajador} retiró {self.cantidad} de {self.articulo}"
+        return f"{self.articulo.descripcion_articulo} retirado por {self.trabajador.nombre_trabajador}"

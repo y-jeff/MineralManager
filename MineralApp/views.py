@@ -1,44 +1,58 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse, FileResponse
-from django.conf import settings
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.timezone import now, timezone
-from django.core.exceptions import ValidationError
-from django.contrib import messages
-from django.db.models import Q, Sum, F, Case, When, IntegerField, Count
-from datetime import datetime, date, timedelta
-from itertools import chain
-import json
-import csv
+# Módulos estándar de Python
 import base64
-import re
-
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from reportlab.lib.units import inch
-import matplotlib.pyplot as plt
+import csv
 import io
+import json
+import re
+from datetime import date, datetime, timedelta
+from itertools import chain
+
+# Django - Configuración y utilidades
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.db.models import Case, Count, F, IntegerField, Q, Sum, When
+from django.http import FileResponse, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.decorators import method_decorator
+from datetime import datetime, timedelta
+from django.utils.timezone import make_aware, get_current_timezone, timezone, now
+from django.views.decorators.csrf import csrf_exempt
+# Django - Herramientas adicionales
+from django.http import HttpResponseForbidden
+
+# Bibliotecas de terceros
+import matplotlib.pyplot as plt
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
 from io import BytesIO
 
-from .models import (
-    CustomUser, Trabajador, Area, Cargo, Horario, Jornada, Turno,
-    Capacitacion, CapacitacionTrabajador, Panol, Bodega,
-    ArticuloPanol, ArticuloBodega, Maquinaria, MantenimientoMaquinaria, MovimientoArticulo, RegistroHoras, RetiroArticulo
-)
+# Módulos del proyecto
 from .forms import (
-    ArticuloBodegaForm, ArticuloPanolForm, ProductoForm, CapacitacionForm, TrabajadorForm,
-    CapacitacionTrabajadorForm, CapacitacionTrabajadorFormSet, MovimientoArticuloForm, RetiroArticuloForm
+    ArticuloBodegaForm, ArticuloPanolForm, CapacitacionForm,
+    CapacitacionTrabajadorForm, CapacitacionTrabajadorFormSet,
+    MovimientoArticuloForm, ProductoForm, RetiroArticuloForm, TrabajadorForm
+)
+from .models import (
+    Area, ArticuloBodega, ArticuloPanol, Bodega, Capacitacion,
+    CapacitacionTrabajador, Cargo, CustomUser, Horario, Jornada,
+    Maquinaria, MantenimientoMaquinaria, MovimientoArticulo,
+    Panol, RegistroHoras, RetiroArticulo, Trabajador, Turno
 )
 
 
-# Vista para inicio de sesión
+# Vista para inicio de sesión y redirección si ya está autenticado
 def login_signup_view(request):
+    # Si el usuario ya está autenticado, redirige al home
+    if request.user.is_authenticated:
+        return redirect('home')
+
     if request.method == "POST":
         if 'confirm_password' not in request.POST:
             username = request.POST.get("username")
@@ -56,169 +70,47 @@ def login_signup_view(request):
                     return render(request, 'login.html', {'error': 'Su cuenta no ha sido confirmada.'})
             else:
                 return render(request, 'login.html', {'error': 'Nombre de usuario o contraseña incorrectos.'})
+    
     return render(request, 'login.html')
 
 
 # Página Principal
-
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
-from django.db.models import Sum
-import matplotlib.pyplot as plt
-import io
-import base64
-from reportlab.pdfgen import canvas
-from .models import RegistroHoras, MovimientoArticulo, RetiroArticulo
-
-
 @login_required
 def index(request):
-    # Datos de trabajadores
-    total_horas_esperadas_trabajadores = RegistroHoras.objects.filter(trabajador__isnull=False).aggregate(Sum('horas_esperadas'))['horas_esperadas__sum'] or 0
-    total_horas_trabajadas_trabajadores = RegistroHoras.objects.filter(trabajador__isnull=False).aggregate(Sum('horas_trabajadas'))['horas_trabajadas__sum'] or 0
+    # KPIs
+    total_trabajadores = Trabajador.objects.filter(activo=True).count()
 
-    porcentaje_trabajadores = (
-        (total_horas_trabajadas_trabajadores / total_horas_esperadas_trabajadores) * 100
-        if total_horas_esperadas_trabajadores > 0 else 0
-    )
+    # Certificaciones próximas a expirar (solo trabajadores activos)
+    certificaciones_proximas = CapacitacionTrabajador.objects.filter(
+        trabajador__activo=True,
+        fecha_fin__isnull=False,
+        fecha_fin__lte=now() + timedelta(days=90),
+        fecha_fin__gte=now()
+    ).select_related('trabajador', 'capacitacion')
 
-    # Datos de maquinarias
-    total_horas_esperadas_maquinarias = RegistroHoras.objects.filter(maquinaria__isnull=False).aggregate(Sum('horas_esperadas'))['horas_esperadas__sum'] or 0
-    total_horas_trabajadas_maquinarias = RegistroHoras.objects.filter(maquinaria__isnull=False).aggregate(Sum('horas_trabajadas'))['horas_trabajadas__sum'] or 0
+    certificaciones_data = [
+        {
+            "trabajador": cert.trabajador,
+            "capacitacion": cert.capacitacion,
+            "fecha_fin": cert.fecha_fin,
+            "dias_restantes": (cert.fecha_fin - now().date()).days,
+        }
+        for cert in certificaciones_proximas
+    ]
 
-    porcentaje_maquinarias = (
-        (total_horas_trabajadas_maquinarias / total_horas_esperadas_maquinarias) * 100
-        if total_horas_esperadas_maquinarias > 0 else 0
-    )
+    # Maquinarias en mantenimiento
+    maquinaria_en_mantenimiento = Maquinaria.objects.filter(estado="mantenimiento").count()
 
-    # Movimientos en bodega
-    movimientos_bodega_data = MovimientoArticulo.objects.values('origen__nombre_bodega').annotate(
-        total_movimientos=Sum('cantidad')
-    )
-
-    # Retiros en pañol
-    retiros_pañol_data = (
-        RetiroArticulo.objects.values("articulo__nombre_articulo")
-        .annotate(total_cantidad=Sum("cantidad"))
-    )
-
-    # Gráficos
-    chart_trabajadores = generar_grafico_horas(
-        RegistroHoras.objects.filter(trabajador__isnull=False).values('area__nombre_area').annotate(
-            horas_trabajadas=Sum('horas_trabajadas'),
-            horas_esperadas=Sum('horas_esperadas'),
-        ),
-        "Horas Trabajadas por Área (Trabajadores)"
-    )
-
-    chart_maquinarias = generar_grafico_horas(
-        RegistroHoras.objects.filter(maquinaria__isnull=False).values('area__nombre_area').annotate(
-            horas_trabajadas=Sum('horas_trabajadas'),
-            horas_esperadas=Sum('horas_esperadas'),
-        ),
-        "Horas Trabajadas por Área (Maquinarias)"
-    )
-
-    chart_movimientos_bodega = generar_grafico_barras_simple(
-        data=movimientos_bodega_data,
-        label_name="origen__nombre_bodega",
-        value_name="total_movimientos",
-        title="Movimientos de Bodega a Pañol",
-        color="blue"
-    )
-
-    chart_retiros_pañol = generar_grafico_barras_simple(
-        data=retiros_pañol_data,
-        label_name="articulo__nombre_articulo",
-        value_name="total_cantidad",
-        title="Retiros en Pañol",
-        color="green"
-    )
+    # Maquinarias inactivas
+    maquinaria_inactiva = Maquinaria.objects.filter(estado="inactivo").count()
 
     context = {
-        "total_horas_esperadas_trabajadores": total_horas_esperadas_trabajadores,
-        "total_horas_trabajadas_trabajadores": total_horas_trabajadas_trabajadores,
-        "porcentaje_trabajadores": round(porcentaje_trabajadores, 2),
-
-        "total_horas_esperadas_maquinarias": total_horas_esperadas_maquinarias,
-        "total_horas_trabajadas_maquinarias": total_horas_trabajadas_maquinarias,
-        "porcentaje_maquinarias": round(porcentaje_maquinarias, 2),
-
-        "chart_trabajadores": chart_trabajadores,
-        "chart_maquinarias": chart_maquinarias,
-        "chart_movimientos_bodega": chart_movimientos_bodega,
-        "chart_retiros_pañol": chart_retiros_pañol,
+        "total_trabajadores": total_trabajadores,
+        "certificaciones_data": certificaciones_data,
+        "maquinaria_en_mantenimiento": maquinaria_en_mantenimiento,
+        "maquinaria_inactiva": maquinaria_inactiva,
     }
-
     return render(request, "index.html", context)
-
-
-# Función para gráficos de horas
-def generar_grafico_horas(data, titulo, color1="blue", color2="green"):
-    if not data:
-        return ""
-
-    areas = [d["area__nombre_area"] for d in data]
-    horas_esperadas = [d["horas_esperadas"] for d in data]
-    horas_trabajadas = [d["horas_trabajadas"] for d in data]
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.bar(areas, horas_esperadas, label="Horas Esperadas", color=color1)
-    ax.bar(areas, horas_trabajadas, label="Horas Trabajadas", color=color2, alpha=0.7)
-    ax.set_title(titulo)
-    ax.set_ylabel("Horas")
-    ax.set_xticks(range(len(areas)))
-    ax.set_xticklabels(areas, rotation=45, ha="right")
-    ax.legend()
-    plt.tight_layout()
-
-    buffer = io.BytesIO()
-    plt.savefig(buffer, format="png")
-    buffer.seek(0)
-    image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    buffer.close()
-    return image_base64
-
-
-# Función para gráficos simples de barras
-def generar_grafico_barras_simple(data, label_name, value_name, title=None, color='blue'):
-    labels = [d.get(label_name, 'Desconocido') for d in data]
-    values = [d.get(value_name, 0) for d in data]
-
-    fig, ax = plt.subplots()
-    ax.bar(labels, values, color=color)
-    ax.set_xlabel(label_name)
-    ax.set_ylabel(value_name)
-    if title:
-        ax.set_title(title)
-
-    plt.xticks(rotation=45, ha='right')
-
-    buffer = io.BytesIO()
-    plt.savefig(buffer, format='png', bbox_inches='tight')
-    buffer.seek(0)
-    image_png = buffer.getvalue()
-    buffer.close()
-
-    image_base64 = base64.b64encode(image_png).decode('utf-8')
-    plt.close(fig)
-
-    return image_base64
-
-
-# Función para generar un informe PDF
-def generar_informe_pdf(request):
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'inline; filename="informe.pdf"'
-
-    p = canvas.Canvas(response)
-    p.drawString(100, 750, "Informe generado desde Mineral Manager")
-    p.showPage()
-    p.save()
-
-    return response
-
 
 
 #Vistas para subir archivo
@@ -421,7 +313,35 @@ def procesar_csv_maquinarias(reader):
         else:
             print(f"Maquinaria con código {row['Código']} no encontrada.")
 
-            
+def handle_despidos_csv(file):
+    """
+    Procesa un archivo CSV para activar/desactivar trabajadores masivamente.
+    El CSV debe tener columnas 'RUT' y 'Activo' (True/False).
+    """
+    decoded_file = file.read().decode('utf-8').splitlines()
+    reader = csv.DictReader(decoded_file)
+
+    rut_no_encontrados = []  # Lista para rastrear RUTs no encontrados
+
+    for row in reader:
+        rut = row.get('RUT')  # Obtiene el RUT
+        estado = row.get('Activo', 'False').strip().lower() == 'true'  # Convierte 'Activo' a booleano
+
+        if not rut:
+            continue  # Salta filas sin RUT
+
+        try:
+            trabajador = Trabajador.objects.get(rut=rut)
+            trabajador.activo = estado  # Cambia el estado del atributo 'activo'
+            trabajador.save()  # Guarda los cambios
+        except Trabajador.DoesNotExist:
+            rut_no_encontrados.append(rut)  # Agrega el RUT no encontrado a la lista
+
+    return rut_no_encontrados  # Retorna los RUTs no encontrados para notificar al usuario
+
+
+
+# Página de carga de archivos          
 @login_required
 def upload_csv(request):
     if request.method == 'POST':
@@ -446,7 +366,7 @@ def upload_csv(request):
                         continue
                     handle_trabajadores_csv(file)
                     messages.success(request, f"{file.name}: Datos de trabajadores procesados.")
-                
+
                 elif file.name == 'Maquinarias.csv':
                     required_columns = ['Código', 'Horas Trabajadas', 'Fecha']
                     if not all(col in reader.fieldnames for col in required_columns):
@@ -454,7 +374,7 @@ def upload_csv(request):
                         continue
                     procesar_csv_maquinarias(reader)
                     messages.success(request, f"{file.name}: Horas de maquinarias procesadas.")
-                
+
                 elif file.name == 'Capacitaciones.csv':
                     required_columns = ['RUT', 'Capacitacion', 'Fecha Inicio']
                     if not all(col in reader.fieldnames for col in required_columns):
@@ -463,7 +383,6 @@ def upload_csv(request):
                     handle_capacitaciones_csv(file)
                     messages.success(request, f"{file.name}: Datos de capacitaciones procesados.")
 
-                # Agrega validaciones para otros tipos de archivos
                 elif file.name == 'Inventario_Panol.csv':
                     handle_articulo_panol_csv(file)
                     messages.success(request, f"{file.name}: Datos de inventario de pañol procesados.")
@@ -480,15 +399,30 @@ def upload_csv(request):
                     handle_movimientos_csv(file)
                     messages.success(request, f"{file.name}: Datos de movimientos procesados.")
 
+                elif file.name == 'Despidos.csv':
+                    required_columns = ['RUT', 'Activo']
+                    if not all(col in reader.fieldnames for col in required_columns):
+                        messages.error(request, f"{file.name} no contiene las columnas requeridas: {required_columns}.")
+                        continue
+                    
+                    # Procesa despidos masivos
+                    rut_no_encontrados = handle_despidos_csv(file)
+                    
+                    if rut_no_encontrados:
+                        messages.warning(request, f"Los siguientes RUT no fueron encontrados: {', '.join(rut_no_encontrados)}.")
+                    else:
+                        messages.success(request, f"{file.name}: Todos los trabajadores han sido procesados correctamente.")
+
                 else:
                     messages.error(request, f"{file.name}: El archivo no es reconocido.")
-            
+
             except Exception as e:
                 messages.error(request, f"Ocurrió un error procesando {file.name}: {e}")
 
         return redirect('upload_success')  # Redirige a la página de éxito
 
     return render(request, 'upload.html')  # Renderiza la página de subida
+
 
 # Página de éxito de carga
 @login_required
@@ -775,82 +709,46 @@ def articulo_bodega_view(request):
     articulos = ArticuloBodega.objects.all()
     return render(request, 'articulobodega.html', {'form': form, 'articulos': articulos})
 
-
-
-#maquinaria
-@login_required
-def maquinaria(request):
-    maquinarias = Maquinaria.objects.all()
-    areas = Area.objects.all()
-
-    # Procesar la creación de nueva maquinaria
-    if request.method == 'POST' and 'crear' in request.POST:
-        nombre_maquinaria = request.POST.get('nombre_maquinaria')
-        codigo_maquinaria = request.POST.get('codigo_maquinaria')
-        fecha_adquisicion = request.POST.get('fecha_adquisicion')
-        estado = request.POST.get('estado')
-        area_id = request.POST.get('area')
-
-        if nombre_maquinaria and codigo_maquinaria and fecha_adquisicion and estado and area_id:
-            area = get_object_or_404(Area, id=area_id)
-            Maquinaria.objects.create(
-                nombre_maquinaria=nombre_maquinaria,
-                codigo_maquinaria=codigo_maquinaria,
-                fecha_adquisicion=fecha_adquisicion,
-                estado=estado,
-                area=area
-            )
-            messages.success(request, "Nueva maquinaria creada con éxito.")
-            return redirect('maquinaria')
-
-    # Procesar la edición de maquinaria existente
-    if request.method == 'POST' and 'editar_id' in request.POST:
-        maquinaria_id = request.POST.get('editar_id')
-        maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
-
-        maquinaria.nombre_maquinaria = request.POST.get('nombre_maquinaria')
-        maquinaria.codigo_maquinaria = request.POST.get('codigo_maquinaria')
-        maquinaria.fecha_adquisicion = request.POST.get('fecha_adquisicion')
-        maquinaria.estado = request.POST.get('estado')
-        area_id = request.POST.get('area')
-        maquinaria.area = get_object_or_404(Area, id=area_id)
-        maquinaria.save()
-
-        messages.success(request, f"La maquinaria {maquinaria.nombre_maquinaria} fue actualizada con éxito.")
-        return redirect('maquinaria')
-
-    # Procesar la eliminación de maquinaria existente
-    if request.method == 'POST' and 'eliminar_id' in request.POST:
-        maquinaria_id = request.POST.get('eliminar_id')
-        maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
-        maquinaria.delete()
-        messages.success(request, f"La maquinaria {maquinaria.nombre_maquinaria} fue eliminada con éxito.")
-        return redirect('maquinaria')
-
-    context = {
-        'maquinarias': maquinarias,
-        'areas': areas,
-    }
-    return render(request, "maquinaria.html", context)
-
-
 #retiro articulo
+@login_required
 def retiro_articulo_view(request):
-    # Recuperamos todos los retiros realizados para mostrarlos en el historial
-    retiros = RetiroArticulo.objects.all()
+    # Historial de retiros
+    retiros = RetiroArticulo.objects.all()  # Ordenar por más recientes
 
+    # Procesar formulario de retiro
     if request.method == 'POST':
         form = RetiroArticuloForm(request.POST)
         if form.is_valid():
-            form.save()
-            # Redirigimos a la misma página para actualizar la lista después del registro
-            return redirect('retiro_articulo')
+            trabajador = form.cleaned_data['trabajador']
+            articulo = form.cleaned_data['articulo']
+            cantidad = form.cleaned_data['cantidad']
+
+            # Validar que la cantidad solicitada no exceda el inventario
+            if articulo.cantidad >= cantidad:
+                articulo.cantidad -= cantidad  # Descontar la cantidad retirada
+                articulo.save()
+
+                # Crear el registro de retiro
+                retiro = RetiroArticulo.objects.create(
+                    trabajador=trabajador,
+                    articulo=articulo,
+                    cantidad=cantidad
+                )
+                retiro.save()
+                messages.success(request, "El retiro se registró correctamente.")
+                return redirect('retiro_articulo')
+            else:
+                messages.error(request, "La cantidad solicitada excede el inventario disponible.")
+        else:
+            messages.error(request, "Por favor, corrija los errores en el formulario.")
     else:
         form = RetiroArticuloForm()
 
-    return render(request, 'retiroarticulo.html', {'form': form, 'retiros': retiros})
-
-
+    context = {
+        'form': form,
+        'retiros': retiros,
+    }
+    return render(request, 'retiro_articulo.html', context)
 
 
 # Normalizar RUT
@@ -859,6 +757,20 @@ def normalizar_rut(rut):
 
 # Vista para gestión de trabajadores
 
+
+def corregir_certificaciones_invalidas():
+    """
+    Corrige las certificaciones no renovables eliminando cualquier fecha de finalización inválida.
+    """
+    certificaciones_invalidas = CapacitacionTrabajador.objects.filter(
+        Q(capacitacion__es_renovable=False) & ~Q(fecha_fin=None)
+    )
+
+    for cert in certificaciones_invalidas:
+        cert.fecha_fin = None
+        cert.save()
+
+#Trabajadores
 @login_required
 def trabajadores_view(request):
     trabajadores = Trabajador.objects.filter(activo=True)
@@ -885,16 +797,29 @@ def trabajadores_view(request):
 
     # Filtrar por certificaciones próximas a expirar o expiradas
     certificacion = request.GET.get('certificacion', '')
-    if certificacion == "expira_30":
-        fecha_limite = timezone.now() + timedelta(days=30)
+    if certificacion == "expira_90":
+        fecha_limite = now() + timedelta(days=90)
         trabajadores = trabajadores.filter(
             capacitaciontrabajador__fecha_fin__lte=fecha_limite,
-            capacitaciontrabajador__fecha_fin__gte=timezone.now()
+            capacitaciontrabajador__fecha_fin__gte=now()
+        )
+    elif certificacion == "expira_30":
+        fecha_limite = now() + timedelta(days=30)
+        trabajadores = trabajadores.filter(
+            capacitaciontrabajador__fecha_fin__lte=fecha_limite,
+            capacitaciontrabajador__fecha_fin__gte=now()
         )
     elif certificacion == "expirada":
         trabajadores = trabajadores.filter(
-            capacitaciontrabajador__fecha_fin__lt=timezone.now()
+            capacitaciontrabajador__fecha_fin__lt=now()
         )
+
+    # **Advertencia**: Verificar si hay trabajadores activos con certificaciones próximas a expirar o expiradas
+    advertencia = CapacitacionTrabajador.objects.filter(
+        trabajador__activo=True,
+        fecha_fin__lte=now() + timedelta(days=90),  # Próximas a expirar en 90 días
+        fecha_fin__gte=now()
+    ).exists()
 
     # Preparar datos para el template
     trabajadores_data = []
@@ -911,6 +836,7 @@ def trabajadores_view(request):
     context = {
         'trabajadores_data': trabajadores_data,
         'areas': Area.objects.all(),
+        'advertencia': advertencia,  # Pasar la advertencia al template
     }
     return render(request, 'trabajadores.html', context)
 
@@ -1076,6 +1002,23 @@ def eliminar_certificacion(request, cert_id):
     except Exception as e:
         return JsonResponse({'success': False, 'message': f'Error al eliminar certificación: {str(e)}'})
 
+#Actualizacion de Certificaciones
+def actualizar_capacitacion_trabajador(request, pk):
+    capacitacion_trabajador = get_object_or_404(CapacitacionTrabajador, pk=pk)
+
+    # Validar que no se pueda asignar fecha de fin a capacitaciones no renovables
+    if not capacitacion_trabajador.capacitacion.es_renovable and 'fecha_fin' in request.POST:
+        fecha_fin = request.POST.get('fecha_fin')
+        if fecha_fin:
+            raise ValidationError(
+                f"La capacitación '{capacitacion_trabajador.capacitacion.nombre_capacitacion}' no es renovable y no puede tener una fecha de finalización."
+            )
+
+    # Actualizar los datos normalmente
+    capacitacion_trabajador.fecha_inicio = request.POST.get('fecha_inicio')
+    capacitacion_trabajador.fecha_fin = request.POST.get('fecha_fin', None)
+    capacitacion_trabajador.save()
+    return JsonResponse({'success': True})
 
 # Ocultar trabajador (equivalente a eliminar visualmente)
 @csrf_exempt
@@ -1145,3 +1088,98 @@ def descargar_informe_trabajadores(request):
     return FileResponse(buffer, as_attachment=True, filename="informe_trabajadores.pdf")
 
 from django.http import HttpResponseForbidden
+
+#Maquinaria
+@login_required
+def maquinaria_view(request):
+    maquinarias = Maquinaria.objects.all()
+
+    # Filtros de búsqueda
+    search_query = request.GET.get('search', '')
+    if search_query:
+        maquinarias = maquinarias.filter(
+            Q(nombre_maquinaria__icontains=search_query) |
+            Q(area__nombre_area__icontains=search_query) |
+            Q(estado__icontains=search_query)
+        )
+
+    # Filtrar por estado
+    estado = request.GET.get('estado', '')
+    if estado:
+        maquinarias = maquinarias.filter(estado=estado)
+
+    # Filtrar por área
+    area_id = request.GET.get('area', '')
+    if area_id:
+        maquinarias = maquinarias.filter(area_id=area_id)
+
+    context = {
+        'maquinarias': maquinarias,
+        'areas': Area.objects.all(),
+        'estados': dict(Maquinaria.ESTADOS),  # Convertir a dict para usar en el template
+        'selected_estado': estado,
+        'selected_area': area_id,
+        'search_query': search_query,
+    }
+    return render(request, 'maquinaria.html', context)
+
+
+
+@login_required
+def add_maquinaria(request):
+    if request.method == 'POST':
+        nombre = request.POST.get('nombre_maquinaria')
+        estado = request.POST.get('estado')
+        area_id = request.POST.get('area')
+        area = Area.objects.get(id=area_id) if area_id else None
+
+        Maquinaria.objects.create(
+            nombre_maquinaria=nombre,
+            estado=estado,
+            area=area,
+            fecha_adquisicion=now().date()  # Fecha actual al agregar
+        )
+        messages.success(request, f"La maquinaria {nombre} fue añadida exitosamente.")
+        return redirect('maquinaria')
+
+@login_required
+def edit_maquinaria(request, maquinaria_id):
+    maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
+
+    if request.method == 'POST':
+        nombre_maquinaria = request.POST.get('nombre_maquinaria')
+        estado = request.POST.get('estado')
+        area_id = request.POST.get('area')
+        fecha_adquisicion = request.POST.get('fecha_adquisicion')
+
+        # Validar y convertir la fecha
+        try:
+            fecha_adquisicion = datetime.strptime(fecha_adquisicion, '%d-%m-%Y').strftime('%Y-%m-%d')
+        except ValueError:
+            return JsonResponse({'error': 'Formato de fecha inválido. Use DD-MM-YYYY.'}, status=400)
+
+        # Actualizar los datos
+        maquinaria.nombre_maquinaria = nombre_maquinaria
+        maquinaria.estado = estado
+        maquinaria.area_id = area_id
+        maquinaria.fecha_adquisicion = fecha_adquisicion
+
+        try:
+            maquinaria.save()
+            messages.success(request, f"La maquinaria {maquinaria.nombre_maquinaria} fue editada exitosamente.")
+            return redirect('maquinaria')
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
+@login_required
+def delete_maquinaria(request, maquinaria_id):
+    maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
+    if request.method == "POST":
+        maquinaria.delete()
+        messages.success(request, f"La maquinaria {maquinaria.nombre_maquinaria} fue eliminada exitosamente.")
+        return redirect('maquinaria')
+    else:
+        messages.error(request, "No se pudo eliminar la maquinaria.")
+        return redirect('maquinaria')
