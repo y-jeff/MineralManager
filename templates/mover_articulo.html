@@ -104,6 +104,7 @@
         <table class="table table-striped">
             <thead>
                 <tr>
+                    <th>ID</th>
                     <th>Fecha</th>
                     <th>Artículo</th>
                     <th>Cantidad</th>
@@ -115,6 +116,7 @@
             <tbody>
                 {% for movimiento in historial %}
                 <tr>
+                    <td>{{ movimiento.id }}</td>
                     <td>{{ movimiento.fecha_movimiento|date:"d/m/Y" }}</td>
                     <td>{{ movimiento.articulo.nombre_articulo }}</td>
                     <td>{{ movimiento.cantidad }}</td>
