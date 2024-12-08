@@ -197,12 +197,33 @@ class MantenimientoMaquinaria(models.Model):
 
 # Movimiento de Articulo
 class MovimientoArticulo(models.Model):
-    articulo = models.ForeignKey(ArticuloBodega, on_delete=models.RESTRICT)
-    origen = models.ForeignKey(Bodega, on_delete=models.RESTRICT, related_name='origen_bodega')
-    destino = models.ForeignKey(Panol, on_delete=models.RESTRICT, related_name='destino_panol')
-    cantidad = models.IntegerField()
-    fecha_movimiento = models.DateField(default=timezone.now)
-    motivo = models.CharField(max_length=200, blank=True, null=True)
+    articulo = models.ForeignKey(ArticuloBodega, on_delete=models.CASCADE)
+    origen = models.ForeignKey(Bodega, on_delete=models.CASCADE)
+    destino = models.ForeignKey(Panol, on_delete=models.CASCADE)
+    cantidad = models.PositiveIntegerField()
+    motivo = models.TextField(blank=True, null=True)
+    fecha_movimiento = models.DateTimeField(auto_now_add=True)
+
+    @staticmethod
+    def mover_articulo(articulo, destino, cantidad, motivo):
+        articulo.cantidad -= cantidad
+        articulo.save()
+
+        ArticuloPanol.objects.update_or_create(
+            nombre_articulo=articulo.nombre_articulo,
+            panol=destino,
+            defaults={'cantidad': F('cantidad') + cantidad}
+        )
+
+        MovimientoArticulo.objects.create(
+            articulo=articulo,
+            origen=articulo.bodega,
+            destino=destino,
+            cantidad=cantidad,
+            motivo=motivo
+        )
+
+
     
 # Registro de horas
 class RegistroHoras(models.Model):

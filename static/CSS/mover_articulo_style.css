@@ -1,0 +1,16 @@
+.table-bordered th, .table-bordered td {
+    border: 1px solid #dee2e6; /* Color del borde de las celdas */
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: #f8f9fa; /* Color para filas impares */
+}
+
+.table-striped tbody tr:nth-of-type(even) {
+    background-color: #ffffff; /* Color para filas pares */
+}
+
+thead {
+    text-align: center; /* Centrar texto en el encabezado */
+    font-weight: bold;
+}

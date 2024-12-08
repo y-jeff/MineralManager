@@ -1,33 +1,13 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    {% load static %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Principal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .metric-box {
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 20px;
-            margin: 15px 0;
-            background-color: #ffffff;
-            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        .metric-title {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: #495057;
-        }
-        .metric-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #343a40;
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'css/index_style.css' %}">
 </head>
 <body>
     <header>
@@ -39,7 +19,7 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarCollapse">
                     <div class="navbar-nav mx-lg-auto">
-                        <a class="nav-item nav-link active " href="/home">Home</a>
+                        <a class="nav-item nav-link active" href="/home">Home</a>
                         <a class="nav-item nav-link" href="/trabajadores">Trabajadores</a>
                         <a class="nav-item nav-link" href="/maquinaria">Maquinaria</a>
                         <a class="nav-item nav-link" href="/pañol">Pañol</a>
@@ -50,70 +30,60 @@
                     </div>
                 </div>
             </div>
-                     <!-- Dropdown de usuario -->
-                     <style>
-                        .dropdown-item.text-danger:hover {
-                          color: white !important;
-                          background-color: red !important;
-                        }
-                      </style>
-                     <div class="dropdown">
-                        <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            {{ request.user.username }}
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                            <li class="dropdown-header">
-                                <strong>{{ request.user.username }}</strong><br>
-                                <small>{{ request.user.email }}</small>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
-                        </ul>
-                    </div>
+                 <!-- Dropdown de usuario -->
+                 <style>
+                    .dropdown-item.text-danger:hover {
+                      color: white !important;
+                      background-color: red !important;
+                    }
+                  </style>
+                 <div class="dropdown">
+                    <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        {{ request.user.username }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li class="dropdown-header">
+                            <strong>{{ request.user.username }}</strong><br>
+                            <small>{{ request.user.email }}</small>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+                    </ul>
+                </div>
         </nav>
-    </header>    
-    {% block content %}
-    <div class="container mt-5">
-        <h2 class="mb-4">Panel Principal</h2>
-    
-        <!-- KPIs -->
-        <div class="row mb-5">
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title">Trabajadores Activos</h5>
-                        <p class="display-6">{{ total_trabajadores }}</p>
-                    </div>
-                </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    </header>
+    <div class="container mt-4">
+        <h2 class="mb-4 text-center">Panel Principal</h2>
+        <div class="row">
+            <div class="box purple">
+                <div class="value" id="totalTrabajadores">{{ total_trabajadores }}</div>
+                <div class="title">Trabajadores</div>
             </div>
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title">Certificaciones Próximas a Expirar</h5>
-                        <p class="display-6">{{ certificaciones_data|length }}</p>
-                    </div>
-                </div>
+            <div class="box blue">
+                <div class="value" id="stockBajoPanol">{{ stock_bajo_panol }}</div>
+                <div class="title">Stock Bajo en Pañol</div>
             </div>
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title">Maquinaria en Mantenimiento</h5>
-                        <p class="display-6">{{ maquinaria_en_mantenimiento }}</p>
-                    </div>
-                </div>
+            <div class="box orange">
+                <div class="value" id="stockBajoBodega">{{ stock_bajo_bodega }}</div>
+                <div class="title">Stock Bajo en Bodega</div>
             </div>
-            <div class="col-md-3">
-                <div class="card text-center">
-                    <div class="card-body">
-                        <h5 class="card-title">Maquinaria Inactiva</h5>
-                        <p class="display-6">{{ maquinaria_inactiva }}</p>
-                    </div>
-                </div>
+            <div class="box green">
+                <div class="value" id="certificacionesProximas">{{ certificaciones_proximas }}</div>
+                <div class="title">Certificaciones Próximas</div>
+            </div>
+            <div class="box blue">
+                <div class="value" id="maquinariaMantenimiento">{{ maquinaria_mantenimiento }}</div>
+                <div class="title">Maquinaria en Mantenimiento</div>
+            </div>
+            <div class="box orange">
+                <div class="value" id="maquinariaInactiva">{{ maquinaria_inactiva }}</div>
+                <div class="title">Maquinaria Inactiva</div>
             </div>
         </div>
     
-           <!-- Tabla de certificaciones próximas a expirar -->
-        <h3>Certificaciones Próximas a Expirar</h3>
+        <!-- Tabla de certificaciones próximas a expirar -->
+        <h3 class="mt-5">Certificaciones Próximas a Expirar</h3>
         <table class="table table-striped table-bordered mt-3">
             <thead class="table-dark">
                 <tr>
@@ -125,21 +95,38 @@
             </thead>
             <tbody>
                 {% for cert in certificaciones_data %}
-                <tr>
-                    <td>{{ cert.trabajador.nombre_trabajador }}</td>
-                    <td>{{ cert.capacitacion.nombre_capacitacion }}</td>
-                    <td>{{ cert.fecha_fin|date:"d-m-Y" }}</td>
-                    <td>{{ cert.dias_restantes }}</td>
-                </tr>
+                    <tr>
+                        <td>{{ cert.trabajador.nombre_trabajador }}</td>
+                        <td>{{ cert.capacitacion.nombre_capacitacion }}</td>
+                        <td>{{ cert.fecha_fin|date:"d-m-Y" }}</td>
+                        <td>{{ cert.dias_restantes }}</td>
+                    </tr>
                 {% empty %}
-                <tr>
-                    <td colspan="4" class="text-center">No hay certificaciones próximas a expirar.</td>
-                </tr>
+                    <tr>
+                        <td colspan="4" class="text-center">No hay certificaciones próximas a expirar.</td>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    {% endblock %}
     
+    <script>
+        const data = {
+            totalTrabajadores: {{ total_trabajadores }},
+            stockBajoPanol: {{ stock_bajo_panol }},
+            stockBajoBodega: {{ stock_bajo_bodega }},
+            certificacionesProximas: {{ certificaciones_data|length }},
+            maquinariaMantenimiento: {{ maquinaria_en_mantenimiento }},
+            maquinariaInactiva: {{ maquinaria_inactiva }}
+        };
+
+        // Actualizar valores en las tarjetas
+        Object.keys(data).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                element.textContent = data[key];
+            }
+        });
+    </script>
 </body>
 </html>

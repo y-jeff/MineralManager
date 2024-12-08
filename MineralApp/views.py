@@ -18,7 +18,7 @@ from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from datetime import datetime, timedelta
-from django.utils.timezone import make_aware, get_current_timezone, timezone, now
+from django.utils.timezone import localtime, now, timezone
 from django.views.decorators.csrf import csrf_exempt
 # Django - Herramientas adicionales
 from django.http import HttpResponseForbidden
@@ -76,16 +76,15 @@ def login_signup_view(request):
 
 # Página Principal
 @login_required
-def index(request):
-    # KPIs
-    total_trabajadores = Trabajador.objects.filter(activo=True).count()
 
-    # Certificaciones próximas a expirar (solo trabajadores activos)
-    certificaciones_proximas = CapacitacionTrabajador.objects.filter(
-        trabajador__activo=True,
-        fecha_fin__isnull=False,
+def index(request):
+    total_trabajadores = Trabajador.objects.filter(activo=True).count()
+    stock_bajo_panol = ArticuloPanol.objects.filter(cantidad__lte=10).count()
+    stock_bajo_bodega = ArticuloBodega.objects.filter(cantidad__lte=10).count()
+    certificaciones_proximas_qs = CapacitacionTrabajador.objects.filter(
         fecha_fin__lte=now() + timedelta(days=90),
-        fecha_fin__gte=now()
+        fecha_fin__gte=now(),
+        trabajador__activo=True
     ).select_related('trabajador', 'capacitacion')
 
     certificaciones_data = [
@@ -95,23 +94,23 @@ def index(request):
             "fecha_fin": cert.fecha_fin,
             "dias_restantes": (cert.fecha_fin - now().date()).days,
         }
-        for cert in certificaciones_proximas
+        for cert in certificaciones_proximas_qs
     ]
 
-    # Maquinarias en mantenimiento
-    maquinaria_en_mantenimiento = Maquinaria.objects.filter(estado="mantenimiento").count()
-
-    # Maquinarias inactivas
+    maquinaria_mantenimiento = Maquinaria.objects.filter(estado="mantenimiento").count()
     maquinaria_inactiva = Maquinaria.objects.filter(estado="inactivo").count()
 
     context = {
         "total_trabajadores": total_trabajadores,
+        "stock_bajo_panol": stock_bajo_panol,
+        "stock_bajo_bodega": stock_bajo_bodega,
+        "certificaciones_proximas": len(certificaciones_data),
         "certificaciones_data": certificaciones_data,
-        "maquinaria_en_mantenimiento": maquinaria_en_mantenimiento,
+        "maquinaria_mantenimiento": maquinaria_mantenimiento,
         "maquinaria_inactiva": maquinaria_inactiva,
     }
-    return render(request, "index.html", context)
 
+    return render(request, "index.html", context)
 
 #Vistas para subir archivo
 # Procesa Trabajadores.csv
@@ -696,24 +695,70 @@ def descargar_informe_bodega(request):
 
 #artciculo bodega
 @login_required
-def articulo_bodega_view(request):
-    if request.method == 'POST':
-        form = MovimientoArticuloForm(request.POST)
-        if form.is_valid():
-            form.save()
-            # Puedes añadir un mensaje de éxito
-            return redirect('articulo_bodega')
-    else:
-        form = MovimientoArticuloForm()
+def obtener_articulos_por_bodega(request, bodega_id):
+    """
+    Devuelve los artículos disponibles en la bodega seleccionada.
+    """
+    articulos = ArticuloBodega.objects.filter(
+        bodega_id=bodega_id,  # Coincide con la bodega seleccionada
+        cantidad__gt=0        # Cantidad mayor que 0
+    ).values(
+        'id', 'nombre_articulo', 'cantidad'
+    )
+    return JsonResponse(list(articulos), safe=False)
 
-    articulos = ArticuloBodega.objects.all()
-    return render(request, 'articulobodega.html', {'form': form, 'articulos': articulos})
+@login_required
+def mover_articulo_view(request):
+    # Cargar las bodegas y pañoles
+    bodegas = Bodega.objects.all()
+    panoles = Panol.objects.all()
+
+    # Si es POST, procesar el movimiento
+    if request.method == 'POST':
+        articulo_id = request.POST.get('articulo')
+        cantidad = int(request.POST.get('cantidad'))
+        origen_id = request.POST.get('origen')
+        destino_id = request.POST.get('destino')
+        motivo = request.POST.get('motivo', '')
+
+        # Validar el artículo y las cantidades
+        articulo = get_object_or_404(ArticuloBodega, id=articulo_id, bodega_id=origen_id)
+        destino = get_object_or_404(Panol, id=destino_id)
+
+        if cantidad > articulo.cantidad:
+            messages.error(request, "Cantidad solicitada excede el inventario disponible.")
+            return redirect('mover_articulo')
+
+        # Actualizar cantidades y registrar movimiento
+        articulo.cantidad -= cantidad
+        articulo.save()
+
+        MovimientoArticulo.objects.create(
+            articulo=articulo,
+            origen=articulo.bodega,
+            destino=destino,
+            cantidad=cantidad,
+            motivo=motivo,
+            fecha_movimiento=now()
+        )
+        messages.success(request, f"Movimiento exitoso de {cantidad} {articulo.nombre_articulo}.")
+        return redirect('mover_articulo')
+
+    # Historial de movimientos
+    historial = MovimientoArticulo.objects.all().order_by('-fecha_movimiento')
+
+    context = {
+        'bodegas': bodegas,
+        'panoles': panoles,
+        'historial': historial,
+    }
+    return render(request, 'mover_articulo.html', context)
 
 #retiro articulo
 @login_required
 def retiro_articulo_view(request):
     # Historial de retiros
-    retiros = RetiroArticulo.objects.all()  # Ordenar por más recientes
+    retiros = RetiroArticulo.objects.all().order_by('-fecha_retiro')  # Ordenar por fecha descendente
 
     # Procesar formulario de retiro
     if request.method == 'POST':

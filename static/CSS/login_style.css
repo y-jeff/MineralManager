@@ -1,85 +1,109 @@
-body, html {
-    height: 100%;
+/* Estilos generales */
+* {
     margin: 0;
-    font-family: Arial, sans-serif;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-.login-page {
-    background: linear-gradient(135deg, #003366, #0066cc); /* Fondo degradado azul */
+body {
     display: flex;
-    align-items: center;
     justify-content: center;
-    height: 100vh;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(120deg, #3498db, #8e44ad); /* Fondo gradiente */
 }
 
+/* Contenedor principal */
 .login-container {
-    border-radius: 8px;
-    overflow: hidden;
-    background-color: #ffffff;
-    box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.2); /* Sombra para resaltar el cuadro de login */
+    background: white;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1); /* Sombra ligera */
+    width: 100%;
+    max-width: 400px;
 }
 
-.login-container .col-md-6.logo-section {
-    background-color: #003366; /* Azul oscuro sólido para el logo */
-    color: #ffffff;
+/* Encabezado del formulario */
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.login-header h1 {
+    color: #2c3e50; /* Azul oscuro para el texto */
+    font-size: 2rem;
+    margin-top: 0.5rem;
+}
+
+/* Formulario */
+.login-form {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    gap: 1.5rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.form-group input {
+    padding: 0.8rem;
+    border: 2px solid #ddd;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #3498db; /* Azul claro en el foco */
+}
+
+/* Botón de inicio de sesión */
+.login-button {
+    background: #3498db; /* Azul claro */
+    color: white;
+    padding: 1rem;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.login-button:hover {
+    background: #2980b9; /* Azul oscuro en hover */
+}
+
+/* Opciones adicionales */
+.additional-options {
+    margin-top: 1.5rem;
     text-align: center;
 }
 
-.logo-section i {
-    font-size: 80px; /* Tamaño del icono */
+.additional-options a {
+    color: #3498db; /* Azul claro */
+    text-decoration: none;
+    font-size: 0.9rem;
 }
 
-.logo-section h2 {
-    font-size: 2rem;
-    margin-top: 1rem;
+.additional-options a:hover {
+    text-decoration: underline;
 }
 
-.btn-primary {
-    background-color: #007bff; /* Azul brillante para el botón */
-    border-color: #007bff;
-    color: #ffffff;
-    width: 100%;
-    font-weight: bold;
-}
-
-.btn-primary:hover {
-    background-color: #0056b3;
-    border-color: #0056b3;
-}
-
-.input-group-text {
-    background-color: #003366; /* Fondo azul oscuro para iconos */
-    color: #ffffff;
-}
-
-h3 {
-    color: #003366; /* Texto de color azul oscuro */
-    font-weight: bold;
-    margin-bottom: 1rem;
-}
-
-.input-group .form-control {
-    border-radius: 0;
-    border-color: #cccccc;
-}
-
-a {
-    color: #007bff; /* Azul para enlaces */
-}
-
-a:hover {
-    color: #0056b3;
-}
-
-@media (max-width: 768px) {
-    .logo-section i {
-        font-size: 60px; /* Reducción del tamaño del icono en pantallas pequeñas */
-    }
-    .logo-section h2 {
-        font-size: 1.5rem;
+/* Responsividad para pantallas pequeñas */
+@media (max-width: 480px) {
+    .login-container {
+        margin: 1rem;
+        padding: 1.5rem;
     }
 }

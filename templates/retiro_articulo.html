@@ -67,9 +67,10 @@
     <!-- Historial de retiros -->
     <h2 class="mb-3">Historial de Retiros</h2>
     <div class="table-responsive">
-        <table id="retirosTabla" class="table table-bordered table-striped">
+        <table  class="table table-bordered table-striped">
             <thead class="table-dark">
                 <tr>
+                    <th>ID</th>
                     <th>Trabajador</th>
                     <th>RUT</th>
                     <th>Artículo</th>
@@ -81,6 +82,7 @@
             <tbody>
                 {% for retiro in retiros %}
                 <tr>
+                    <td>{{ retiro.id  }}</td>
                     <td>{{ retiro.trabajador.nombre_trabajador }}</td>
                     <td>{{ retiro.trabajador.rut }}</td>
                     <td>{{ retiro.articulo }}</td>

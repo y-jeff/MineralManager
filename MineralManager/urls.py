@@ -67,7 +67,7 @@ urlpatterns = [
     path('bodega/descargar_informe/', views.descargar_informe_bodega, name='descargar_informe_bodega'),
 
     # vista articulo bodega
-    path("articulobodega/", views.articulo_bodega_view, name="articulo_bodega"),
+    path("articulobodega/", views.mover_articulo_view, name="articulo_bodega"),
 
     #vista maquinaria
     path('maquinaria/', views.maquinaria_view, name='maquinaria'),
@@ -76,6 +76,6 @@ urlpatterns = [
     path('maquinaria/delete/<int:maquinaria_id>/', views.delete_maquinaria, name='delete_maquinaria'),
 
     #vista retiro
-    path('retiro/', views.retiro_articulo_view, name='retiro_articulo'),
-
+    path('articulobodega/', views.mover_articulo_view, name='mover_articulo'),
+    path('api/articulos/<int:bodega_id>/', views.obtener_articulos_por_bodega, name='obtener_articulos_por_bodega'),
 ]
