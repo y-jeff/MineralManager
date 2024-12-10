@@ -222,8 +222,6 @@ class MovimientoArticulo(models.Model):
             cantidad=cantidad,
             motivo=motivo
         )
-
-
     
 # Registro de horas
 class RegistroHoras(models.Model):

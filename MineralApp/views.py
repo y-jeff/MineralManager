@@ -6,6 +6,7 @@ import json
 import re
 from datetime import date, datetime, timedelta
 from itertools import chain
+import chardet
 
 # Django - Configuración y utilidades
 from django.conf import settings
@@ -18,8 +19,9 @@ from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.decorators import method_decorator
 from datetime import datetime, timedelta
-from django.utils.timezone import localtime, now, timezone
+from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
+
 # Django - Herramientas adicionales
 from django.http import HttpResponseForbidden
 
@@ -76,14 +78,15 @@ def login_signup_view(request):
 
 # Página Principal
 @login_required
-
 def index(request):
     total_trabajadores = Trabajador.objects.filter(activo=True).count()
     stock_bajo_panol = ArticuloPanol.objects.filter(cantidad__lte=10).count()
     stock_bajo_bodega = ArticuloBodega.objects.filter(cantidad__lte=10).count()
+
+    # Obtener certificaciones próximas a expirar (90 días o menos) o expiradas
     certificaciones_proximas_qs = CapacitacionTrabajador.objects.filter(
-        fecha_fin__lte=now() + timedelta(days=90),
-        fecha_fin__gte=now(),
+        Q(fecha_fin__lte=now() + timedelta(days=90), fecha_fin__gte=now()) |
+        Q(fecha_fin__lt=now()),
         trabajador__activo=True
     ).select_related('trabajador', 'capacitacion')
 
@@ -92,7 +95,7 @@ def index(request):
             "trabajador": cert.trabajador,
             "capacitacion": cert.capacitacion,
             "fecha_fin": cert.fecha_fin,
-            "dias_restantes": (cert.fecha_fin - now().date()).days,
+            "dias_restantes": (cert.fecha_fin - now().date()).days if cert.fecha_fin >= now().date() else "Expirada",
         }
         for cert in certificaciones_proximas_qs
     ]
@@ -112,324 +115,268 @@ def index(request):
 
     return render(request, "index.html", context)
 
-#Vistas para subir archivo
-# Procesa Trabajadores.csv
-def handle_trabajadores_csv(file):
-    decoded_file = file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
-    for row in reader:
-        area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
-        cargo, _ = Cargo.objects.get_or_create(nombre_cargo=row['Cargo'])
-        jornada, _ = Jornada.objects.get_or_create(tipo_jornada=row['Jornada'])
-        turno, _ = Turno.objects.get_or_create(tipo_turno=row['Turno'])
-        horario, _ = Horario.objects.get_or_create(ciclo=row['Ciclo'])
 
-        trabajador, created = Trabajador.objects.update_or_create(
-            rut=row['RUT'],
-            defaults={
-                'nombre_trabajador': row['Nombre'],
-                'area': area,
-                'cargo': cargo,
-                'jornada': jornada,
-                'turno': turno,
-                'horario': horario,
-            }
-        )
+# ------------------ SUBIDA DE ARCHIVOS ------------------
 
-        if created or not RegistroHoras.objects.filter(trabajador=trabajador).exists():
-            RegistroHoras.objects.create(
-                trabajador=trabajador,
-                area=area,
-                horas_esperadas=int(row.get('Horas', 40)),
-                horas_trabajadas=int(row.get('Horas Trabajadas', 0)),
-                fecha_registro=timezone.now()
-            )
+def decode_csv_file(file):
+    raw_data = file.read()
+    result = chardet.detect(raw_data)
+    encoding = result['encoding']
+    decoded_file = raw_data.decode(encoding).splitlines()
+    return decoded_file
 
-
-# Procesa Capacitaciones.csv
-def handle_capacitaciones_csv(file):
+def procesar_despidos_csv(file):
     """
-    Procesa el archivo Capacitaciones.csv y actualiza o crea registros únicos por combinación de trabajador y capacitación.
+    Procesa el archivo Despidos.csv y actualiza el estado de los trabajadores en la base de datos.
     """
-    decoded_file = file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
-    for row in reader:
-        trabajador = Trabajador.objects.filter(rut=row['RUT']).first()
-        if trabajador:
-            capacitacion, _ = Capacitacion.objects.get_or_create(nombre_capacitacion=row['Capacitacion'])
-            CapacitacionTrabajador.objects.update_or_create(
-                trabajador=trabajador,
-                capacitacion=capacitacion,
-                defaults={
-                    'fecha_inicio': row['Fecha Inicio'],
-                    'fecha_fin': row['Fecha Fin'] if row['Fecha Fin'] else None,
-                }
-            )
-
-# Procesa Inventario_Panol.csv
-def handle_articulo_panol_csv(file):
-    """
-    Procesa el archivo Inventario_Panol.csv y actualiza o crea registros únicos basados en nombre_articulo y pañol.
-    """
-    decoded_file = file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
-    for row in reader:
-        panol, _ = Panol.objects.get_or_create(nombre_panol=row['Pañol'])
-        ArticuloPanol.objects.update_or_create(
-            nombre_articulo=row['Nombre Articulo'],
-            panol=panol,
-            defaults={
-                'descripcion_articulo': row['Descripción'],
-                'cantidad': int(row['Cantidad']),
-            }
-        )
-
-# Procesa Inventario_Bodega.csv
-def handle_articulo_bodega_csv(file):
-    """
-    Procesa el archivo Inventario_Bodega.csv y actualiza o crea registros únicos basados en nombre_articulo y bodega.
-    """
-    decoded_file = file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
-    for row in reader:
-        bodega, _ = Bodega.objects.get_or_create(nombre_bodega=row['Bodega'])
-        ArticuloBodega.objects.update_or_create(
-            nombre_articulo=row['Nombre Articulo'],
-            bodega=bodega,
-            defaults={
-                'descripcion_articulo': row['Descripción'],
-                'cantidad': int(row['Cantidad']),
-            }
-        )
-
-# Procesa Maquinarias.csv
-def handle_maquinarias_csv(file):
-    """
-    Procesa el archivo Maquinarias.csv y actualiza o crea registros únicos basados en el código de maquinaria.
-    """
-    decoded_file = file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
-    for row in reader:
-        # Obtén o crea el área asociada
-        area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
+    try:
+        # Leer el archivo CSV
+        decoded_file = file.read().decode('utf-8', errors='replace').splitlines()
+        reader = csv.DictReader(decoded_file)
         
-        # Actualiza o crea la maquinaria con horas esperadas
-        Maquinaria.objects.update_or_create(
-            codigo_maquinaria=row['Código'],  # Identificador único
-            defaults={
-                'nombre_maquinaria': row['Nombre Maquinaria'],
-                'fecha_adquisicion': row['Fecha Adquisición'],
-                'estado': row['Estado'],
-                'area': area,
-                'horas_esperadas': int(row['Horas Esperadas']),
-            }
-        )
+        # Validar que la columna 'RUT' esté presente
+        if 'RUT' not in reader.fieldnames:
+            raise Exception("El archivo Despidos.csv debe contener una columna 'RUT'.")
 
-# Procesa Mantenimiento_Maquinaria.csv
-def handle_mantenimientos_csv(file):
-    """
-    Procesa el archivo Mantenimiento_Maquinaria.csv y actualiza o crea registros únicos basados en maquinaria y fecha de mantenimiento.
-    """
-    decoded_file = file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
-    for row in reader:
-        maquinaria = Maquinaria.objects.filter(codigo_maquinaria=row['Código']).first()
-        if maquinaria:
-            MantenimientoMaquinaria.objects.update_or_create(
-                maquinaria=maquinaria,
-                fecha_mantenimiento=row['Fecha Mantenimiento'],  # Identificador único
-                defaults={
-                    'descripcion': row['Descripción'],
-                    'realizado_por': row['Realizado Por'],
-                }
-            )
+        errores = []
 
-# Procesa Movimientos.csv
-def handle_movimientos_csv(file):
-    """
-    Procesa el archivo Movimientos.csv y actualiza o crea registros únicos basados en artículo, origen y destino.
-    """
-    decoded_file = file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
-    for row in reader:
-        articulo = ArticuloBodega.objects.filter(nombre_articulo=row['Nombre Articulo']).first()
-        if articulo:
-            origen, _ = Bodega.objects.get_or_create(nombre_bodega=row['Bodega Origen'])
-            destino, _ = Panol.objects.get_or_create(nombre_panol=row['Pañol Destino'])
-            MovimientoArticulo.objects.update_or_create(
-                articulo=articulo,
-                origen=origen,
-                destino=destino,
-                defaults={
-                    'cantidad': int(row['Cantidad']),
-                    'fecha_movimiento': row['Fecha Movimiento'],
-                    'motivo': row['Motivo'] if 'Motivo' in row else None,
-                }
-            )
+        # Procesar cada fila
+        for row in reader:
+            rut = row.get('RUT').strip()
+            motivo = row.get('Motivo', '').strip()
+            fecha_despido = row.get('Fecha Despido', '').strip()
 
-# Procesa Horas Trabajadas - Trabajadores
-def procesar_csv_trabajadores(reader):
-    """
-    Procesa un archivo CSV para registrar las horas trabajadas de los trabajadores.
-    """
-    for row in reader:
-        # Busca el trabajador basado en el RUT
-        trabajador = Trabajador.objects.filter(rut=row['RUT']).first()
+            try:
+                # Buscar el trabajador por RUT
+                trabajador = Trabajador.objects.filter(rut=rut).first()
+                if trabajador:
+                    # Marcar como inactivo
+                    trabajador.activo = False
+                    trabajador.save()
 
-        if trabajador:
-            # Crear el registro de horas
-            RegistroHoras.objects.create(
-                tipo='trabajador',
-                trabajador=trabajador,
-                area=trabajador.area,  # Se asume que el trabajador tiene un área asociada
-                horas_trabajadas=int(row['Horas Trabajadas']),
-                fecha_registro=row['Fecha']  # El CSV debe incluir un campo de fecha
-            )
+                    # Registrar el motivo o la fecha si están presentes (opcional)
+                    if motivo or fecha_despido:
+                        # Lógica adicional para guardar información del despido si es necesaria
+                        pass
+                else:
+                    errores.append(f"Trabajador con RUT {rut} no encontrado.")
+            except Exception as e:
+                errores.append(f"Error procesando RUT {rut}: {e}")
+
+        # Retornar errores si los hay
+        return errores
+    except UnicodeDecodeError as e:
+        raise Exception(f"Error de codificación en el archivo: {e}")
+    except Exception as e:
+        raise Exception(f"Error al procesar el archivo Despidos.csv: {e}")
+
+
+
+def procesar_archivo_csv(nombre_archivo, file):
+    try:
+        # Detectar el archivo y llamar a la función correspondiente
+        if nombre_archivo == 'Trabajadores.csv':
+            procesar_trabajadores_csv(file)
+        elif nombre_archivo == 'Capacitaciones.csv':
+            procesar_capacitaciones_csv(file)
+        elif nombre_archivo == 'Inventario_Panol.csv':
+            procesar_inventario_panol_csv(file)
+        elif nombre_archivo == 'Inventario_Bodega.csv':
+            procesar_inventario_bodega_csv(file)
+        elif nombre_archivo == 'Despidos.csv':
+            procesar_despidos_csv(file)
+        elif nombre_archivo == 'Maquinarias.csv':
+            procesar_maquinarias_csv(file)
         else:
-            print(f"Trabajador con RUT {row['RUT']} no encontrado.")
-
-# Procesa Horas Trabajadas - Maquinarias
-
-def procesar_csv_maquinarias(reader):
-    """
-    Procesa un archivo CSV para registrar las horas trabajadas de las maquinarias.
-    """
-    for row in reader:
-        # Busca la maquinaria basada en el código
-        maquinaria = Maquinaria.objects.filter(codigo_maquinaria=row['Código']).first()
-
-        if maquinaria:
-            # Verifica si la columna `Fecha` existe en el archivo
-            fecha_registro = row.get('Fecha', date.today())  # Usa la fecha actual si no está en el CSV
-
-            RegistroHoras.objects.create(
-                tipo='maquinaria',
-                maquinaria=maquinaria,
-                area=maquinaria.area,  # Se asume que la maquinaria tiene un área asociada
-                horas_trabajadas=int(row['Horas Trabajadas']),
-                fecha_registro=fecha_registro
-            )
-        else:
-            print(f"Maquinaria con código {row['Código']} no encontrada.")
-
-def handle_despidos_csv(file):
-    """
-    Procesa un archivo CSV para activar/desactivar trabajadores masivamente.
-    El CSV debe tener columnas 'RUT' y 'Activo' (True/False).
-    """
-    decoded_file = file.read().decode('utf-8').splitlines()
-    reader = csv.DictReader(decoded_file)
-
-    rut_no_encontrados = []  # Lista para rastrear RUTs no encontrados
-
-    for row in reader:
-        rut = row.get('RUT')  # Obtiene el RUT
-        estado = row.get('Activo', 'False').strip().lower() == 'true'  # Convierte 'Activo' a booleano
-
-        if not rut:
-            continue  # Salta filas sin RUT
-
-        try:
-            trabajador = Trabajador.objects.get(rut=rut)
-            trabajador.activo = estado  # Cambia el estado del atributo 'activo'
-            trabajador.save()  # Guarda los cambios
-        except Trabajador.DoesNotExist:
-            rut_no_encontrados.append(rut)  # Agrega el RUT no encontrado a la lista
-
-    return rut_no_encontrados  # Retorna los RUTs no encontrados para notificar al usuario
+            raise Exception(f"El archivo {nombre_archivo} no es reconocido.")
+    except UnicodeDecodeError as e:
+        raise Exception(f"Error de codificación en {nombre_archivo}: {e}")
+    except Exception as e:
+        raise Exception(f"Error al procesar {nombre_archivo}: {e}")
 
 
-
-# Página de carga de archivos          
 @login_required
 def upload_csv(request):
     if request.method == 'POST':
-        files = request.FILES.getlist('file')  # Soporte para múltiples archivos
+        if 'file' not in request.FILES:
+            messages.error(request, "No se seleccionó ningún archivo.")
+            return redirect('upload_csv')  # O cualquier URL de retorno
 
-        for file in files:
-            try:
-                # Verifica si es un archivo CSV
-                if not file.name.endswith('.csv'):
-                    messages.error(request, f"{file.name} no es un archivo CSV válido.")
-                    continue
+        archivo = request.FILES['file']
+        try:
+            # Procesa el archivo
+            nombre_archivo = archivo.name
+            procesar_archivo_csv(nombre_archivo, archivo)
+            messages.success(request, f"El archivo {nombre_archivo} se procesó correctamente.")
+        except Exception as e:
+            messages.error(request, f"Error al procesar {nombre_archivo}: {e}")
+        return redirect('upload_csv')
 
-                # Lee el contenido del archivo
-                decoded_file = file.read().decode('utf-8').splitlines()
-                reader = csv.DictReader(decoded_file)
+    return render(request, 'upload.html')
 
-                # Verifica si tiene columnas requeridas
-                if file.name == 'Trabajadores.csv':
-                    required_columns = ['RUT', 'Nombre', 'Area', 'Horas']
-                    if not all(col in reader.fieldnames for col in required_columns):
-                        messages.error(request, f"{file.name} no contiene las columnas requeridas: {required_columns}.")
-                        continue
-                    handle_trabajadores_csv(file)
-                    messages.success(request, f"{file.name}: Datos de trabajadores procesados.")
 
-                elif file.name == 'Maquinarias.csv':
-                    required_columns = ['Código', 'Horas Trabajadas', 'Fecha']
-                    if not all(col in reader.fieldnames for col in required_columns):
-                        messages.error(request, f"{file.name} no contiene las columnas requeridas: {required_columns}.")
-                        continue
-                    procesar_csv_maquinarias(reader)
-                    messages.success(request, f"{file.name}: Horas de maquinarias procesadas.")
 
-                elif file.name == 'Capacitaciones.csv':
-                    required_columns = ['RUT', 'Capacitacion', 'Fecha Inicio']
-                    if not all(col in reader.fieldnames for col in required_columns):
-                        messages.error(request, f"{file.name} no contiene las columnas requeridas: {required_columns}.")
-                        continue
-                    handle_capacitaciones_csv(file)
-                    messages.success(request, f"{file.name}: Datos de capacitaciones procesados.")
 
-                elif file.name == 'Inventario_Panol.csv':
-                    handle_articulo_panol_csv(file)
-                    messages.success(request, f"{file.name}: Datos de inventario de pañol procesados.")
+# Procesadores de CSV
+def procesar_trabajadores_csv(file):
+    """
+    Procesa el archivo Trabajadores.csv y actualiza o crea registros únicos basados en el RUT.
+    Si el registro no incluye las horas esperadas, se asume un valor predeterminado de 40.
+    """
+    try:
+        decoded_file = decode_csv_file(file)
+        reader = csv.DictReader(decoded_file)
 
-                elif file.name == 'Inventario_Bodega.csv':
-                    handle_articulo_bodega_csv(file)
-                    messages.success(request, f"{file.name}: Datos de inventario de bodega procesados.")
+        for row in reader:
+            # Obtener o crear objetos relacionados
+            area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
+            cargo, _ = Cargo.objects.get_or_create(nombre_cargo=row['Cargo'])
+            jornada, _ = Jornada.objects.get_or_create(tipo_jornada=row['Jornada'])
+            turno, _ = Turno.objects.get_or_create(tipo_turno=row['Turno'])
+            horario, _ = Horario.objects.get_or_create(ciclo=row['Ciclo'])
 
-                elif file.name == 'Mantenimiento_Maquinaria.csv':
-                    handle_mantenimientos_csv(file)
-                    messages.success(request, f"{file.name}: Datos de mantenimientos procesados.")
+            # Crear o actualizar el trabajador
+            trabajador, _ = Trabajador.objects.update_or_create(
+                rut=row['RUT'],  # Identificador único
+                defaults={
+                    'nombre_trabajador': row['Nombre'],
+                    'area': area,
+                    'cargo': cargo,
+                    'jornada': jornada,
+                    'turno': turno,
+                    'horario': horario,
+                    'activo': True,
+                }
+            )
 
-                elif file.name == 'Movimientos.csv':
-                    handle_movimientos_csv(file)
-                    messages.success(request, f"{file.name}: Datos de movimientos procesados.")
+            # Procesar horas trabajadas y esperadas
+            horas_esperadas = int(row['Horas']) if 'Horas' in row and row['Horas'] else 40
 
-                elif file.name == 'Despidos.csv':
-                    required_columns = ['RUT', 'Activo']
-                    if not all(col in reader.fieldnames for col in required_columns):
-                        messages.error(request, f"{file.name} no contiene las columnas requeridas: {required_columns}.")
-                        continue
-                    
-                    # Procesa despidos masivos
-                    rut_no_encontrados = handle_despidos_csv(file)
-                    
-                    if rut_no_encontrados:
-                        messages.warning(request, f"Los siguientes RUT no fueron encontrados: {', '.join(rut_no_encontrados)}.")
-                    else:
-                        messages.success(request, f"{file.name}: Todos los trabajadores han sido procesados correctamente.")
+            # Crear o actualizar el registro de horas
+            RegistroHoras.objects.update_or_create(
+                trabajador=trabajador,
+                area=area,
+                fecha_registro=now().date(),  # Fecha actual corregida
+                defaults={
+                    'horas_trabajadas': 0,  # Asumimos que no se han trabajado horas aún
+                    'horas_esperadas': horas_esperadas,
+                }
+            )
+    except Exception as e:
+        raise Exception(f"Error al procesar Trabajadores.csv: {e}")
+    
 
+def procesar_capacitaciones_csv(file):
+    """
+    Procesa el archivo Capacitaciones.csv y actualiza o crea registros únicos por combinación de trabajador y capacitación.
+    """
+    try:
+        decoded_file = decode_csv_file(file)
+        reader = csv.DictReader(decoded_file)
+
+        for row in reader:
+            trabajador = Trabajador.objects.filter(rut=row['RUT']).first()
+            if trabajador:
+                capacitacion, _ = Capacitacion.objects.get_or_create(
+                    nombre_capacitacion=row['Capacitacion']
+                )
+
+                # Determinar si es renovable y ajustar la fecha de finalización
+                if not capacitacion.es_renovable:
+                    fecha_fin = None  # Las capacitaciones no renovables no tienen fecha de fin
                 else:
-                    messages.error(request, f"{file.name}: El archivo no es reconocido.")
+                    fecha_fin = row['Fecha Fin'] if row['Fecha Fin'] else None
 
-            except Exception as e:
-                messages.error(request, f"Ocurrió un error procesando {file.name}: {e}")
+                # Crear o actualizar el registro de capacitación
+                CapacitacionTrabajador.objects.update_or_create(
+                    trabajador=trabajador,
+                    capacitacion=capacitacion,
+                    defaults={
+                        'fecha_inicio': row['Fecha Inicio'],
+                        'fecha_fin': fecha_fin,
+                    }
+                )
+            else:
+                raise Exception(f"Trabajador no encontrado (RUT: {row['RUT']})")
+    except Exception as e:
+        raise Exception(f"Error al procesar Capacitaciones.csv: {e}")
 
-        return redirect('upload_success')  # Redirige a la página de éxito
+def procesar_inventario_panol_csv(file):
+    """
+    Procesa el archivo Inventario_Panol.csv y actualiza o crea registros únicos
+    basados en nombre_articulo y pañol.
+    """
+    try:
+        # Decodificar el archivo
+        decoded_file = decode_csv_file(file)
+        reader = csv.DictReader(decoded_file)
 
-    return render(request, 'upload.html')  # Renderiza la página de subida
+        for row in reader:
+            # Validar campos obligatorios
+            if not all(field in row for field in ['Pañol', 'Nombre Articulo', 'Descripción', 'Cantidad']):
+                raise Exception("Estructura mal realizada. Faltan campos obligatorios.")
+
+            # Obtener o crear el pañol
+            panol, _ = Panol.objects.get_or_create(nombre_panol=row['Pañol'])
+
+            # Actualizar o crear el artículo
+            ArticuloPanol.objects.update_or_create(
+                nombre_articulo=row['Nombre Articulo'],
+                panol=panol,
+                defaults={
+                    'descripcion_articulo': row['Descripción'],
+                    'cantidad': int(row['Cantidad']),
+                }
+            )
+    except UnicodeDecodeError as e:
+        raise Exception(f"Error de codificación en Inventario_Panol.csv: {e}")
+    except Exception as e:
+        raise Exception(f"Error al procesar Inventario_Panol.csv: {e}")
 
 
-# Página de éxito de carga
-@login_required
-def upload_success(request):
-    return render(request, 'upload_success.html', {'message': 'Archivos subidos correctamente.'})
+
+def procesar_inventario_bodega_csv(file):
+    """
+    Procesa el archivo Inventario_Bodega.csv y actualiza o crea registros únicos
+    basados en nombre_articulo y bodega.
+    """
+    try:
+        decoded_file = decode_csv_file(file)
+        reader = csv.DictReader(decoded_file)
+
+        for row in reader:
+            bodega, _ = Bodega.objects.get_or_create(nombre_bodega=row['Bodega'])
+            ArticuloBodega.objects.update_or_create(
+                nombre_articulo=row['Nombre Articulo'],
+                bodega=bodega,
+                defaults={
+                    'descripcion_articulo': row['Descripción'],
+                    'cantidad': int(row['Cantidad']),
+                }
+            )
+    except Exception as e:
+        raise Exception(f"Error al procesar Inventario_Bodega.csv: {e}")
 
 
-# Vista de Pañol
+def procesar_maquinarias_csv(file):
+    try:
+        decoded_file = decode_csv_file(file)
+        reader = csv.DictReader(decoded_file)
+        for row in reader:
+            area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
+            Maquinaria.objects.update_or_create(
+                codigo_maquinaria=row['Código'],  # Identificador único
+                defaults={
+                    'nombre_maquinaria': row['Nombre Maquinaria'],
+                    'fecha_adquisicion': row['Fecha Adquisición'],
+                    'estado': row['Estado'],
+                    'area': area,
+                }
+            )
+    except Exception as e:
+        raise Exception(f"Error al procesar Maquinarias.csv: {e}")
+
+# -------------------- Vista de pañol -----------------------------------
 @login_required
 def panol_view(request):
     search_query = request.GET.get('q', '')
@@ -859,35 +806,35 @@ def trabajadores_view(request):
             capacitaciontrabajador__fecha_fin__lt=now()
         )
 
-    # **Advertencia**: Verificar si hay trabajadores activos con certificaciones próximas a expirar o expiradas
+    # Advertencia de certificaciones próximas a expirar
     advertencia = CapacitacionTrabajador.objects.filter(
         trabajador__activo=True,
         fecha_fin__lte=now() + timedelta(days=90),  # Próximas a expirar en 90 días
         fecha_fin__gte=now()
     ).exists()
 
-    # Preparar datos para el template
+    # Preparar datos para el template, incluyendo certificaciones
     trabajadores_data = []
     for trabajador in trabajadores:
         horas_trabajadas = trabajador.registrohoras_set.aggregate(total=Sum('horas_trabajadas'))['total'] or 0
         horas_esperadas = trabajador.registrohoras_set.aggregate(total=Sum('horas_esperadas'))['total'] or 0
+        certificaciones = CapacitacionTrabajador.objects.filter(trabajador=trabajador)
 
         trabajadores_data.append({
             'trabajador': trabajador,
             'horas_trabajadas': horas_trabajadas,
             'horas_esperadas': horas_esperadas,
+            'certificaciones': certificaciones,  # Incluye certificaciones en el contexto
         })
 
     context = {
         'trabajadores_data': trabajadores_data,
         'areas': Area.objects.all(),
-        'advertencia': advertencia,  # Pasar la advertencia al template
+        'advertencia': advertencia,
     }
+    print(f"Trabajadores cargados al contexto: {len(trabajadores_data)}")
     return render(request, 'trabajadores.html', context)
 
-
-def normalizar_rut(rut):
-    return rut.replace(".", "").strip().upper()
 
 @login_required
 def add_trabajador_view(request):

@@ -53,6 +53,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# Configuración de mensajes
+from django.contrib.messages import constants as messages
+MESSAGE_TAGS = {
+    messages.ERROR: 'danger',  # Bootstrap utiliza 'danger' en lugar de 'error'
+}
+
 ROOT_URLCONF = 'MineralManager.urls'
 
 TEMPLATES = [

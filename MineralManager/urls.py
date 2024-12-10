@@ -38,8 +38,7 @@ urlpatterns = [
     path('home/', views.index, name='home'),
 
     # Subida de archivo
-    path('upload/', views.upload_csv, name='upload_file'),
-    path('upload/success/', views.upload_success, name='upload_success'),
+    path('upload/', views.upload_csv, name='upload_csv'),
 
     # Cambio de contraseña
     path('password_reset/', auth_views.PasswordResetView.as_view(template_name='password_reset_form.html'), name='password_reset'),
