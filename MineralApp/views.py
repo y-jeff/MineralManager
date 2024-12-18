@@ -1,12 +1,11 @@
 # Módulos estándar de Python
-import base64
 import csv
-import io
 import json
-import re
-from datetime import date, datetime, timedelta
-from itertools import chain
+from datetime import datetime, timedelta
 import chardet
+import locale
+
+locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
 # Django - Configuración y utilidades
 from django.conf import settings
@@ -14,41 +13,36 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
-from django.db.models import Case, Count, F, IntegerField, Q, Sum, When
+from django.db.models import Q, Sum
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils.decorators import method_decorator
 from datetime import datetime, timedelta
 from django.utils.timezone import now
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-
-# Django - Herramientas adicionales
-from django.http import HttpResponseForbidden
+from django.db.models import F
 
 # Bibliotecas de terceros
-import matplotlib.pyplot as plt
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
-from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.pdfgen import canvas
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from io import BytesIO
 
 # Módulos del proyecto
 from .forms import (
-    ArticuloBodegaForm, ArticuloPanolForm, CapacitacionForm,
-    CapacitacionTrabajadorForm, CapacitacionTrabajadorFormSet,
-    MovimientoArticuloForm, ProductoForm, RetiroArticuloForm, TrabajadorForm
+    ArticuloBodegaForm, ArticuloPanolForm,
+    CapacitacionTrabajadorFormSet,
+    RetiroArticuloForm,
 )
 from .models import (
     Area, ArticuloBodega, ArticuloPanol, Bodega, Capacitacion,
-    CapacitacionTrabajador, Cargo, CustomUser, Horario, Jornada,
-    Maquinaria, MantenimientoMaquinaria, MovimientoArticulo,
-    Panol, RegistroHoras, RetiroArticulo, Trabajador, Turno
+    CapacitacionTrabajador, Cargo, Horario, Jornada,
+    Maquinaria, MovimientoArticulo,
+    Panol, RegistroHoras, RetiroArticulo, Trabajador, Turno,
+    MantenimientoMaquinaria, TrabajoMaquinaria
+
 )
-
-
 # Vista para inicio de sesión y redirección si ya está autenticado
 def login_signup_view(request):
     # Si el usuario ya está autenticado, redirige al home
@@ -80,8 +74,8 @@ def login_signup_view(request):
 @login_required
 def index(request):
     total_trabajadores = Trabajador.objects.filter(activo=True).count()
-    stock_bajo_panol = ArticuloPanol.objects.filter(cantidad__lte=10).count()
-    stock_bajo_bodega = ArticuloBodega.objects.filter(cantidad__lte=10).count()
+    stock_bajo_panol = ArticuloPanol.objects.filter(cantidad__lte=50).count()
+    stock_bajo_bodega = ArticuloBodega.objects.filter(cantidad__lte=50).count()
 
     # Obtener certificaciones próximas a expirar (90 días o menos) o expiradas
     certificaciones_proximas_qs = CapacitacionTrabajador.objects.filter(
@@ -100,8 +94,8 @@ def index(request):
         for cert in certificaciones_proximas_qs
     ]
 
-    maquinaria_mantenimiento = Maquinaria.objects.filter(estado="mantenimiento").count()
-    maquinaria_inactiva = Maquinaria.objects.filter(estado="inactivo").count()
+    maquinaria_mantenimiento = Maquinaria.objects.filter(estado="En Mantenimiento").count()
+    maquinaria_inactiva = Maquinaria.objects.filter(estado="Inactivo").count()
 
     context = {
         "total_trabajadores": total_trabajadores,
@@ -116,265 +110,248 @@ def index(request):
     return render(request, "index.html", context)
 
 
-# ------------------ SUBIDA DE ARCHIVOS ------------------
+# --------------------- Vista de Subida de archivos ----------------------------
+import csv
+import chardet
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from .models import *
+from datetime import datetime
+
+# ----------------- DECODIFICAR ARCHIVO CSV -----------------
 
 def decode_csv_file(file):
+    """
+    Decodifica el archivo CSV con la codificación detectada.
+    """
     raw_data = file.read()
     result = chardet.detect(raw_data)
     encoding = result['encoding']
+    print(f"Encoding detectado: {encoding}")  # Depuración
     decoded_file = raw_data.decode(encoding).splitlines()
-    return decoded_file
-
-def procesar_despidos_csv(file):
-    """
-    Procesa el archivo Despidos.csv y actualiza el estado de los trabajadores en la base de datos.
-    """
-    try:
-        # Leer el archivo CSV
-        decoded_file = file.read().decode('utf-8', errors='replace').splitlines()
-        reader = csv.DictReader(decoded_file)
-        
-        # Validar que la columna 'RUT' esté presente
-        if 'RUT' not in reader.fieldnames:
-            raise Exception("El archivo Despidos.csv debe contener una columna 'RUT'.")
-
-        errores = []
-
-        # Procesar cada fila
-        for row in reader:
-            rut = row.get('RUT').strip()
-            motivo = row.get('Motivo', '').strip()
-            fecha_despido = row.get('Fecha Despido', '').strip()
-
-            try:
-                # Buscar el trabajador por RUT
-                trabajador = Trabajador.objects.filter(rut=rut).first()
-                if trabajador:
-                    # Marcar como inactivo
-                    trabajador.activo = False
-                    trabajador.save()
-
-                    # Registrar el motivo o la fecha si están presentes (opcional)
-                    if motivo or fecha_despido:
-                        # Lógica adicional para guardar información del despido si es necesaria
-                        pass
-                else:
-                    errores.append(f"Trabajador con RUT {rut} no encontrado.")
-            except Exception as e:
-                errores.append(f"Error procesando RUT {rut}: {e}")
-
-        # Retornar errores si los hay
-        return errores
-    except UnicodeDecodeError as e:
-        raise Exception(f"Error de codificación en el archivo: {e}")
-    except Exception as e:
-        raise Exception(f"Error al procesar el archivo Despidos.csv: {e}")
+    return csv.DictReader(decoded_file)
 
 
-
+# ----------------- PROCESAR ARCHIVO CSV -----------------
 def procesar_archivo_csv(nombre_archivo, file):
+    """
+    Identifica el archivo CSV y llama a la función de procesamiento correspondiente.
+    """
+    reader = decode_csv_file(file)
+    columnas = reader.fieldnames
+    print(f"Columnas detectadas en el archivo '{nombre_archivo}': {columnas}")
+
     try:
-        # Detectar el archivo y llamar a la función correspondiente
-        if nombre_archivo == 'Trabajadores.csv':
-            procesar_trabajadores_csv(file)
-        elif nombre_archivo == 'Capacitaciones.csv':
-            procesar_capacitaciones_csv(file)
-        elif nombre_archivo == 'Inventario_Panol.csv':
-            procesar_inventario_panol_csv(file)
-        elif nombre_archivo == 'Inventario_Bodega.csv':
-            procesar_inventario_bodega_csv(file)
-        elif nombre_archivo == 'Despidos.csv':
-            procesar_despidos_csv(file)
-        elif nombre_archivo == 'Maquinarias.csv':
-            procesar_maquinarias_csv(file)
+        if 'RUT' in columnas and 'Nombre' in columnas and 'Area' in columnas:
+            procesar_trabajadores_csv(reader)
+        elif 'Código' in columnas and 'Nombre Maquinaria' in columnas:
+            procesar_maquinarias_csv(reader)
+        elif 'Bodega' in columnas:
+            procesar_inventario_bodega_csv(reader)
+        elif 'Pañol' in columnas:
+            procesar_inventario_panol_csv(reader)
+        elif 'Capacitacion' in columnas and 'Fecha Inicio' in columnas:
+            procesar_capacitaciones_csv(reader)  # Agregado para Capacitaciones.csv
+        elif 'Código' in columnas and 'Fecha Mantenimiento' in columnas:
+            procesar_mantenimientos_csv(reader)
+        elif 'Código' in columnas and 'horas_trabajadas' in columnas:
+            procesar_trabajos_maquinaria_csv(reader)
         else:
-            raise Exception(f"El archivo {nombre_archivo} no es reconocido.")
-    except UnicodeDecodeError as e:
-        raise Exception(f"Error de codificación en {nombre_archivo}: {e}")
+            raise Exception(f"El archivo {nombre_archivo} no es reconocido o tiene formato incorrecto.")
     except Exception as e:
-        raise Exception(f"Error al procesar {nombre_archivo}: {e}")
+        print(f"Error al procesar archivo '{nombre_archivo}': {e}")
+        raise e
 
+        
 
+# ----------------- VISTA PRINCIPAL: UPLOAD CSV -----------------
 @login_required
 def upload_csv(request):
-    if request.method == 'POST':
-        if 'file' not in request.FILES:
-            messages.error(request, "No se seleccionó ningún archivo.")
-            return redirect('upload_csv')  # O cualquier URL de retorno
-
+    """
+    Vista principal para manejar la subida de archivos CSV.
+    """
+    if request.method == 'POST' and 'file' in request.FILES:
         archivo = request.FILES['file']
         try:
-            # Procesa el archivo
-            nombre_archivo = archivo.name
-            procesar_archivo_csv(nombre_archivo, archivo)
-            messages.success(request, f"El archivo {nombre_archivo} se procesó correctamente.")
+            procesar_archivo_csv(archivo.name, archivo)
+            messages.success(request, "Subida con éxito.")  # Mensaje directo
         except Exception as e:
-            messages.error(request, f"Error al procesar {nombre_archivo}: {e}")
-        return redirect('upload_csv')
+            messages.error(request, f"Error: {e}")
+        return redirect('upload_csv')  # Redirige para refrescar la página
 
     return render(request, 'upload.html')
 
+# ----------------- FUNCIONES DE PROCESAMIENTO -----------------
 
-
-
-# Procesadores de CSV
-def procesar_trabajadores_csv(file):
+def procesar_trabajadores_csv(reader):
     """
-    Procesa el archivo Trabajadores.csv y actualiza o crea registros únicos basados en el RUT.
-    Si el registro no incluye las horas esperadas, se asume un valor predeterminado de 40.
+    Procesa el archivo Trabajadores.csv y crea o actualiza trabajadores y sus horas.
     """
-    try:
-        decoded_file = decode_csv_file(file)
-        reader = csv.DictReader(decoded_file)
-
-        for row in reader:
-            # Obtener o crear objetos relacionados
+    for row in reader:
+        try:
+            # Obtener o crear los campos relacionados
             area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
-            cargo, _ = Cargo.objects.get_or_create(nombre_cargo=row['Cargo'])
-            jornada, _ = Jornada.objects.get_or_create(tipo_jornada=row['Jornada'])
             turno, _ = Turno.objects.get_or_create(tipo_turno=row['Turno'])
-            horario, _ = Horario.objects.get_or_create(ciclo=row['Ciclo'])
+            jornada, _ = Jornada.objects.get_or_create(tipo_jornada=row['Jornada'])
+            cargo, _ = Cargo.objects.get_or_create(nombre_cargo=row['Cargo'])
+            horario, _ = Horario.objects.get_or_create(ciclo=row.get('Horario', 'Sin Definir'))
 
-            # Crear o actualizar el trabajador
+            # Crear o actualizar Trabajador
             trabajador, _ = Trabajador.objects.update_or_create(
-                rut=row['RUT'],  # Identificador único
+                rut=row['RUT'],
                 defaults={
                     'nombre_trabajador': row['Nombre'],
                     'area': area,
-                    'cargo': cargo,
-                    'jornada': jornada,
                     'turno': turno,
+                    'jornada': jornada,
+                    'cargo': cargo,
                     'horario': horario,
-                    'activo': True,
                 }
             )
 
-            # Procesar horas trabajadas y esperadas
-            horas_esperadas = int(row['Horas']) if 'Horas' in row and row['Horas'] else 40
-
-            # Crear o actualizar el registro de horas
+            # Registrar horas esperadas y trabajadas
             RegistroHoras.objects.update_or_create(
                 trabajador=trabajador,
-                area=area,
-                fecha_registro=now().date(),  # Fecha actual corregida
+                fecha_registro=timezone.now().date(),
                 defaults={
-                    'horas_trabajadas': 0,  # Asumimos que no se han trabajado horas aún
-                    'horas_esperadas': horas_esperadas,
+                    'area': trabajador.area,  # Asignar el área desde el trabajador
+                    'horas_esperadas': int(row['Horas Esperadas']),
+                    'horas_trabajadas': int(row['Horas']),
                 }
             )
-    except Exception as e:
-        raise Exception(f"Error al procesar Trabajadores.csv: {e}")
-    
+        except Exception as e:
+            raise Exception(f"Error al procesar trabajador RUT {row['RUT']}: {e}")
 
-def procesar_capacitaciones_csv(file):
+def procesar_despidos_csv(reader):
     """
-    Procesa el archivo Capacitaciones.csv y actualiza o crea registros únicos por combinación de trabajador y capacitación.
+    Procesa el archivo Despidos.csv y actualiza el estado de los trabajadores.
     """
-    try:
-        decoded_file = decode_csv_file(file)
-        reader = csv.DictReader(decoded_file)
-
-        for row in reader:
+    for row in reader:
+        try:
             trabajador = Trabajador.objects.filter(rut=row['RUT']).first()
             if trabajador:
-                capacitacion, _ = Capacitacion.objects.get_or_create(
-                    nombre_capacitacion=row['Capacitacion']
+                trabajador.activo = False
+                trabajador.save()
+        except Exception as e:
+            raise Exception(f"Error al procesar despidos: {e}")
+
+def procesar_maquinarias_csv(reader):
+    """
+    Procesa el archivo Maquinarias.csv.
+    """
+    for row in reader:
+        area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
+        Maquinaria.objects.update_or_create(
+            codigo_maquinaria=row['Código'],
+            defaults={
+                'nombre_maquinaria': row['Nombre Maquinaria'],
+                'fecha_adquisicion': datetime.strptime(row['Fecha Adquisición'], "%Y-%m-%d").date(),
+                'estado': row['Estado'],
+                'area': area,
+            }
+        )
+
+def procesar_inventario_panol_csv(reader):
+    """
+    Procesa el archivo Inventario_Panol.csv.
+    """
+    for row in reader:
+        panol, _ = Panol.objects.get_or_create(nombre_panol=row['Pañol'])
+        ArticuloPanol.objects.update_or_create(
+            nombre_articulo=row['Nombre Articulo'],
+            panol=panol,
+            defaults={
+                'descripcion_articulo': row['Descripción'],
+                'cantidad': int(row['Cantidad']),
+            }
+        )
+
+def procesar_inventario_bodega_csv(reader):
+    """
+    Procesa el archivo Inventario_Bodega.csv.
+    """
+    for row in reader:
+        bodega, _ = Bodega.objects.get_or_create(nombre_bodega=row['Bodega'])
+        ArticuloBodega.objects.update_or_create(
+            nombre_articulo=row['Nombre Articulo'],
+            bodega=bodega,
+            defaults={
+                'descripcion_articulo': row['Descripción'],
+                'cantidad': int(row['Cantidad']),
+            }
+        )
+
+def procesar_capacitaciones_csv(reader):
+    """
+    Procesa el archivo Capacitaciones.csv y determina si la capacitación es renovable.
+    """
+    for row in reader:
+        try:
+            trabajador = Trabajador.objects.filter(rut=row['RUT']).first()
+            if trabajador:
+                # Verificar si existe Fecha Fin
+                fecha_inicio = row['Fecha Inicio']
+                fecha_fin = row['Fecha Fin'] if row['Fecha Fin'] else None
+                
+                # Determinar si la capacitación es renovable
+                es_renovable = True if fecha_fin else False
+
+                # Crear o actualizar la capacitación
+                capacitacion, _ = Capacitacion.objects.update_or_create(
+                    nombre_capacitacion=row['Capacitacion'],
+                    defaults={'es_renovable': es_renovable}
                 )
 
-                # Determinar si es renovable y ajustar la fecha de finalización
-                if not capacitacion.es_renovable:
-                    fecha_fin = None  # Las capacitaciones no renovables no tienen fecha de fin
-                else:
-                    fecha_fin = row['Fecha Fin'] if row['Fecha Fin'] else None
-
-                # Crear o actualizar el registro de capacitación
+                # Guardar la relación CapacitacionTrabajador
                 CapacitacionTrabajador.objects.update_or_create(
                     trabajador=trabajador,
                     capacitacion=capacitacion,
                     defaults={
-                        'fecha_inicio': row['Fecha Inicio'],
-                        'fecha_fin': fecha_fin,
+                        'fecha_inicio': fecha_inicio,
+                        'fecha_fin': fecha_fin
                     }
                 )
-            else:
-                raise Exception(f"Trabajador no encontrado (RUT: {row['RUT']})")
-    except Exception as e:
-        raise Exception(f"Error al procesar Capacitaciones.csv: {e}")
+        except Exception as e:
+            raise Exception(f"Error al procesar capacitación: {e}")
 
-def procesar_inventario_panol_csv(file):
+
+
+def procesar_mantenimientos_csv(reader):
     """
-    Procesa el archivo Inventario_Panol.csv y actualiza o crea registros únicos
-    basados en nombre_articulo y pañol.
+    Procesa el archivo Mantenimiento_Maquinaria.csv y registra mantenimientos.
     """
-    try:
-        # Decodificar el archivo
-        decoded_file = decode_csv_file(file)
-        reader = csv.DictReader(decoded_file)
+    for row in reader:
+        try:
+            maquinaria = Maquinaria.objects.get(codigo_maquinaria=row['Código'])
+            trabajador = Trabajador.objects.get(nombre_trabajador=row['Realizado Por'])
 
-        for row in reader:
-            # Validar campos obligatorios
-            if not all(field in row for field in ['Pañol', 'Nombre Articulo', 'Descripción', 'Cantidad']):
-                raise Exception("Estructura mal realizada. Faltan campos obligatorios.")
-
-            # Obtener o crear el pañol
-            panol, _ = Panol.objects.get_or_create(nombre_panol=row['Pañol'])
-
-            # Actualizar o crear el artículo
-            ArticuloPanol.objects.update_or_create(
-                nombre_articulo=row['Nombre Articulo'],
-                panol=panol,
-                defaults={
-                    'descripcion_articulo': row['Descripción'],
-                    'cantidad': int(row['Cantidad']),
-                }
+            MantenimientoMaquinaria.objects.create(
+                maquinaria=maquinaria,
+                realizado_por=trabajador,
+                fecha_mantenimiento=datetime.strptime(row['Fecha Mantenimiento'], "%Y-%m-%d").date(),
+                descripcion=row['Descripción']
             )
-    except UnicodeDecodeError as e:
-        raise Exception(f"Error de codificación en Inventario_Panol.csv: {e}")
-    except Exception as e:
-        raise Exception(f"Error al procesar Inventario_Panol.csv: {e}")
+        except Maquinaria.DoesNotExist:
+            raise Exception(f"Error: No existe maquinaria con código {row['Código']}")
+        except Trabajador.DoesNotExist:
+            raise Exception(f"Error: No existe trabajador {row['Realizado Por']}")
+        except Exception as e:
+            raise Exception(f"Error en mantenimiento: {e}")
 
-
-
-def procesar_inventario_bodega_csv(file):
+def procesar_trabajos_maquinaria_csv(reader):
     """
-    Procesa el archivo Inventario_Bodega.csv y actualiza o crea registros únicos
-    basados en nombre_articulo y bodega.
+    Procesa el archivo Trabajos_Maquinaria.csv.
     """
-    try:
-        decoded_file = decode_csv_file(file)
-        reader = csv.DictReader(decoded_file)
-
-        for row in reader:
-            bodega, _ = Bodega.objects.get_or_create(nombre_bodega=row['Bodega'])
-            ArticuloBodega.objects.update_or_create(
-                nombre_articulo=row['Nombre Articulo'],
-                bodega=bodega,
-                defaults={
-                    'descripcion_articulo': row['Descripción'],
-                    'cantidad': int(row['Cantidad']),
-                }
-            )
-    except Exception as e:
-        raise Exception(f"Error al procesar Inventario_Bodega.csv: {e}")
-
-
-def procesar_maquinarias_csv(file):
-    try:
-        decoded_file = decode_csv_file(file)
-        reader = csv.DictReader(decoded_file)
-        for row in reader:
-            area, _ = Area.objects.get_or_create(nombre_area=row['Area'])
-            Maquinaria.objects.update_or_create(
-                codigo_maquinaria=row['Código'],  # Identificador único
-                defaults={
-                    'nombre_maquinaria': row['Nombre Maquinaria'],
-                    'fecha_adquisicion': row['Fecha Adquisición'],
-                    'estado': row['Estado'],
-                    'area': area,
-                }
-            )
-    except Exception as e:
-        raise Exception(f"Error al procesar Maquinarias.csv: {e}")
+    for row in reader:
+        maquinaria = Maquinaria.objects.get(codigo_maquinaria=row['maquinaria_id'])
+        trabajador = Trabajador.objects.get(rut=row['trabajador_id'])
+        TrabajoMaquinaria.objects.create(
+            maquinaria=maquinaria,
+            trabajador=trabajador,
+            fecha_trabajo=datetime.strptime(row['fecha_trabajo'], "%Y-%m-%d").date(),
+            horas_trabajadas=int(row['horas_trabajadas'])
+        )
 
 # -------------------- Vista de pañol -----------------------------------
 @login_required
@@ -704,8 +681,8 @@ def mover_articulo_view(request):
 #retiro articulo
 @login_required
 def retiro_articulo_view(request):
-    # Historial de retiros
-    retiros = RetiroArticulo.objects.all().order_by('-fecha_retiro')  # Ordenar por fecha descendente
+    # Historial de retiros ordenados por fecha más reciente
+    retiros = RetiroArticulo.objects.all().order_by('-fecha_retiro', '-id')
 
     # Procesar formulario de retiro
     if request.method == 'POST':
@@ -742,6 +719,27 @@ def retiro_articulo_view(request):
     }
     return render(request, 'retiro_articulo.html', context)
 
+@login_required
+def devolver_articulo(request, retiro_id):
+    # Buscar el registro de retiro por ID
+    retiro = get_object_or_404(RetiroArticulo, id=retiro_id)
+
+    # Verificar si ya fue devuelto
+    if not retiro.es_devuelto:  # Solo si no se ha devuelto aún
+        retiro.fecha_devuelta = timezone.now()  # Asignar la fecha actual como devolución
+        retiro.es_devuelto = True  # Marcar el estado como devuelto
+
+        # Devolver la cantidad al inventario del artículo
+        retiro.articulo.cantidad += retiro.cantidad  # Incrementar el stock del artículo
+        retiro.articulo.save()
+
+        retiro.save()  # Guardar los cambios en el registro existente
+
+        messages.success(request, "El artículo ha sido devuelto correctamente.")
+    else:
+        messages.warning(request, "Este artículo ya fue devuelto anteriormente.")
+
+    return redirect('retiro_articulo')  # Redirigir a la página de historial
 
 # Normalizar RUT
 def normalizar_rut(rut):
@@ -1084,7 +1082,12 @@ from django.http import HttpResponseForbidden
 #Maquinaria
 @login_required
 def maquinaria_view(request):
+    # Lista inicial de maquinarias
     maquinarias = Maquinaria.objects.all()
+
+    # Filtrar maquinarias activas y trabajadores activos para los dropdowns
+    maquinarias_activas = Maquinaria.objects.filter(estado="Activo")
+    trabajadores_activos = Trabajador.objects.filter(activo=True)
 
     # Filtros de búsqueda
     search_query = request.GET.get('search', '')
@@ -1105,14 +1108,18 @@ def maquinaria_view(request):
     if area_id:
         maquinarias = maquinarias.filter(area_id=area_id)
 
+    # Contexto para el template
     context = {
         'maquinarias': maquinarias,
+        'maquinarias_activas': maquinarias_activas,
+        'trabajadores_activos': trabajadores_activos,
         'areas': Area.objects.all(),
-        'estados': dict(Maquinaria.ESTADOS),  # Convertir a dict para usar en el template
+        'estados': dict(Maquinaria.ESTADOS),
         'selected_estado': estado,
         'selected_area': area_id,
         'search_query': search_query,
     }
+
     return render(request, 'maquinaria.html', context)
 
 
@@ -1139,31 +1146,28 @@ def edit_maquinaria(request, maquinaria_id):
     maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
 
     if request.method == 'POST':
-        nombre_maquinaria = request.POST.get('nombre_maquinaria')
-        estado = request.POST.get('estado')
-        area_id = request.POST.get('area')
-        fecha_adquisicion = request.POST.get('fecha_adquisicion')
+        estado = request.POST.get('estado')  # Solo se editará el estado
 
-        # Validar y convertir la fecha
-        try:
-            fecha_adquisicion = datetime.strptime(fecha_adquisicion, '%d-%m-%Y').strftime('%Y-%m-%d')
-        except ValueError:
-            return JsonResponse({'error': 'Formato de fecha inválido. Use DD-MM-YYYY.'}, status=400)
+        # Convertir fecha al formato correcto
+        fecha_adquisicion = request.POST.get('fecha_adquisicion', None)
+        if fecha_adquisicion:
+            try:
+                fecha_adquisicion = datetime.strptime(fecha_adquisicion, "%d de %B de %Y").strftime("%Y-%m-%d")
+            except ValueError:
+                messages.error(request, "Formato de fecha inválido. Debe ser DD de Mes de YYYY.")
+                return redirect('maquinaria')
 
-        # Actualizar los datos
-        maquinaria.nombre_maquinaria = nombre_maquinaria
+        # Actualizar solo el estado y dejar fecha intacta si no se envía
         maquinaria.estado = estado
-        maquinaria.area_id = area_id
-        maquinaria.fecha_adquisicion = fecha_adquisicion
+        if fecha_adquisicion:
+            maquinaria.fecha_adquisicion = fecha_adquisicion
 
-        try:
-            maquinaria.save()
-            messages.success(request, f"La maquinaria {maquinaria.nombre_maquinaria} fue editada exitosamente.")
-            return redirect('maquinaria')
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=500)
+        maquinaria.save()
+        messages.success(request, "La maquinaria ha sido actualizada correctamente.")
+        return redirect('maquinaria')
 
     return JsonResponse({'error': 'Método no permitido.'}, status=405)
+
 
 @login_required
 def delete_maquinaria(request, maquinaria_id):
@@ -1175,3 +1179,160 @@ def delete_maquinaria(request, maquinaria_id):
     else:
         messages.error(request, "No se pudo eliminar la maquinaria.")
         return redirect('maquinaria')
+    
+    
+@login_required
+def add_mantenimiento(request):
+    if request.method == "POST":
+        maquinaria_id = request.POST.get('maquinaria')
+        trabajador_id = request.POST.get('trabajador')
+        descripcion = request.POST.get('descripcion')  # Capturar la descripción
+        estado_activo = request.POST.get('estado_activo') == "on"
+
+        try:
+            maquinaria = Maquinaria.objects.get(id=maquinaria_id)
+            trabajador = Trabajador.objects.get(rut=trabajador_id)
+
+            # Guardar mantenimiento con descripción
+            MantenimientoMaquinaria.objects.create(
+                maquinaria=maquinaria,
+                realizado_por=trabajador,
+                fecha_mantenimiento=timezone.now().date(),
+                descripcion=descripcion  # Guardar la descripción
+            )
+
+            # Actualizar estado de la maquinaria
+            if not estado_activo:
+                maquinaria.estado = "En Mantenimiento"
+                maquinaria.save()
+
+            messages.success(request, "Mantenimiento registrado correctamente.")
+        except Exception as e:
+            messages.error(request, f"Error: {e}")
+
+        return redirect('maquinaria')
+
+@login_required
+def add_trabajo_maquinaria(request):
+    if request.method == "POST":
+        print("Datos recibidos del formulario: ", request.POST)  # Depuración
+
+        maquinaria_id = request.POST.get("maquinaria")
+        trabajador_rut = request.POST.get("trabajador")
+        horas_trabajadas = request.POST.get("horas_trabajadas")
+        descripcion = request.POST.get("descripcion")
+
+        try:
+            # Validar campos
+            if not horas_trabajadas or not descripcion:
+                messages.error(request, "Todos los campos son obligatorios.")
+                return redirect('maquinaria')
+
+            if int(horas_trabajadas) > 24 or int(horas_trabajadas) < 1:
+                messages.error(request, "Las horas trabajadas deben estar entre 1 y 24.")
+                return redirect('maquinaria')
+
+            # Obtener instancias
+            maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
+            trabajador = get_object_or_404(Trabajador, rut=trabajador_rut)
+
+            # Guardar el trabajo
+            trabajo = TrabajoMaquinaria.objects.create(
+                maquinaria=maquinaria,
+                trabajador=trabajador,
+                fecha_trabajo=timezone.now().date(),  # Fecha actual
+                horas_trabajadas=int(horas_trabajadas),
+                descripcion=descripcion
+            )
+
+            print("Trabajo guardado: ", trabajo)  # Depuración
+            messages.success(request, "Trabajo agregado exitosamente.")
+            return redirect('maquinaria')
+
+        except Exception as e:
+            print("Error: ", e)  # Depuración
+            messages.error(request, f"Error al guardar el trabajo: {e}")
+            return redirect('maquinaria')
+
+    else:
+        return JsonResponse({"error": "Método no permitido"}, status=405)
+
+@login_required
+def desactivar_maquinaria(request, maquinaria_id):
+    """
+    Cambia el estado de una maquinaria a 'Inactivo' en lugar de eliminarla.
+    """
+    maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
+    if request.method == "POST":
+        maquinaria.estado = "Inactivo"  # Actualiza el estado
+        maquinaria.save()  # Guarda los cambios en la base de datos
+        messages.success(request, f"La maquinaria '{maquinaria.nombre_maquinaria}' ha sido desactivada.")
+        return redirect('maquinaria')  # Redirige a la vista de maquinarias
+    return redirect('maquinaria')
+
+def obtener_mantenimientos(request, maquinaria_id):
+    mantenimientos = MantenimientoMaquinaria.objects.filter(maquinaria_id=maquinaria_id)
+    data = [
+        {
+            'rut': m.trabajador.rut,
+            'nombre_trabajador': m.trabajador.nombre,
+            'codigo_maquinaria': m.maquinaria.codigo,
+            'nombre_maquinaria': m.maquinaria.nombre,
+            'fecha_mantenimiento': m.fecha_mantenimiento.strftime('%Y-%m-%d'),
+            'descripcion': m.descripcion,
+        }
+        for m in mantenimientos
+    ]
+    return JsonResponse(data, safe=False)
+
+def obtener_trabajos(request, maquinaria_id):
+    trabajos = TrabajoMaquinaria.objects.filter(maquinaria_id=maquinaria_id)
+    data = [
+        {
+            'rut': t.trabajador.rut,
+            'nombre_trabajador': t.trabajador.nombre,
+            'codigo_maquinaria': t.maquinaria.codigo,
+            'nombre_maquinaria': t.maquinaria.nombre,
+            'horas_trabajadas': t.horas_trabajadas,
+            'descripcion': t.descripcion,
+        }
+        for t in trabajos
+    ]
+    return JsonResponse(data, safe=False)
+
+
+
+def ver_mantenimientos(request, maquinaria_id):
+    maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
+    search_query = request.GET.get('search', '')
+
+    # Filtrar mantenimientos por búsqueda
+    mantenimientos = MantenimientoMaquinaria.objects.filter(maquinaria=maquinaria).order_by('-fecha_mantenimiento')
+
+    if search_query:
+        mantenimientos = mantenimientos.filter(
+            Q(trabajador__nombre_trabajador__icontains=search_query) |  # Buscar por nombre del trabajador
+            Q(trabajador__rut__icontains=search_query) |               # Buscar por RUT del trabajador
+            Q(descripcion__icontains=search_query) |                   # Buscar en descripción
+            Q(fecha_mantenimiento__icontains=search_query)             # Buscar en fecha
+        )
+
+    return render(request, 'ver_mantenimientos.html', {'mantenimientos': mantenimientos, 'maquinaria': maquinaria, 'search_query': search_query})
+
+
+def ver_trabajos(request, maquinaria_id):
+    maquinaria = get_object_or_404(Maquinaria, id=maquinaria_id)
+    search_query = request.GET.get('search', '')
+
+    # Filtrar trabajos por búsqueda
+    trabajos = TrabajoMaquinaria.objects.filter(maquinaria=maquinaria).order_by('-fecha_trabajo')
+
+    if search_query:
+        trabajos = trabajos.filter(
+            Q(trabajador__nombre_trabajador__icontains=search_query) |  # Buscar por nombre del trabajador
+            Q(trabajador__rut__icontains=search_query) |               # Buscar por RUT del trabajador
+            Q(descripcion__icontains=search_query) |                   # Buscar en descripción
+            Q(fecha_trabajo__icontains=search_query)                   # Buscar en fecha
+        )
+
+    return render(request, 'ver_trabajos.html', {'trabajos': trabajos, 'maquinaria': maquinaria, 'search_query': search_query})

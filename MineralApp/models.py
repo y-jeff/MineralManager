@@ -3,8 +3,7 @@ from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.exceptions import ValidationError
 
-
-# Custom user manager
+# Custom User Manager
 class CustomUserManager(BaseUserManager):
     def create_user(self, username, email, password=None):
         if not email:
@@ -15,6 +14,7 @@ class CustomUserManager(BaseUserManager):
         user = self.model(
             email=self.normalize_email(email),
             username=username,
+            date_joined=timezone.now()
         )
         user.set_password(password)
         user.save(using=self._db)
@@ -26,19 +26,22 @@ class CustomUserManager(BaseUserManager):
             username=username,
             password=password,
         )
-        user.is_admin = True
+        user.is_admin = c
         user.is_staff = True
-        user.is_superuser = True
+        user.is_superuser = True  # Aquí definimos directamente el campo
         user.save(using=self._db)
         return user
 
+# Modelo de Usuario Personalizado
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=50, unique=True)
     email = models.EmailField(max_length=60, unique=True)
-    email_confirmed = models.BooleanField(default=False)  # Agregar el campo aquí
+    email_confirmed = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
     is_staff = models.BooleanField(default=False)
+    is_superuser = models.BooleanField(default=False)  # Campo requerido por Django Admin
+    date_joined = models.DateTimeField(default=timezone.now)
 
     objects = CustomUserManager()
 
@@ -47,6 +50,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.username
+    
 # Área
 class Area(models.Model):
     nombre_area = models.CharField(max_length=100, unique=True)
@@ -185,16 +189,6 @@ class Maquinaria(models.Model):
     def __str__(self):
         return self.nombre_maquinaria
 
-# Mantenimiento Maquinaria
-class MantenimientoMaquinaria(models.Model):
-    maquinaria = models.ForeignKey(Maquinaria, on_delete=models.CASCADE)
-    fecha_mantenimiento = models.DateField()
-    descripcion = models.TextField()
-    realizado_por = models.CharField(max_length=100)
-
-    def __str__(self):
-        return f"Mantenimiento de {self.maquinaria} el {self.fecha_mantenimiento}"
-
 # Movimiento de Articulo
 class MovimientoArticulo(models.Model):
     articulo = models.ForeignKey(ArticuloBodega, on_delete=models.CASCADE)
@@ -238,6 +232,42 @@ class RetiroArticulo(models.Model):
     articulo = models.ForeignKey(ArticuloPanol, on_delete=models.CASCADE)
     cantidad = models.PositiveIntegerField()
     fecha_retiro = models.DateField(auto_now_add=True)
+    fecha_devuelta = models.DateField(null=True, blank=True)  # Nueva fecha de devolución
+    es_devuelto = models.BooleanField(default=False)  # Estado para identificar devolución
+
+    def clean(self):
+        # Validar que no se devuelva más de lo que fue retirado
+        if self.cantidad > self.articulo.cantidad:
+            raise ValidationError("La cantidad retirada no puede exceder el stock.")
 
     def __str__(self):
-        return f"{self.articulo.descripcion_articulo} retirado por {self.trabajador.nombre_trabajador}"
+        return f"Retiro: {self.articulo.nombre_articulo} por {self.trabajador.nombre_trabajador}"
+
+# Mantenimiento de maquinaria
+class MantenimientoMaquinaria(models.Model):
+    maquinaria = models.ForeignKey(Maquinaria, on_delete=models.CASCADE)
+    fecha_mantenimiento = models.DateField()
+    descripcion = models.TextField()
+    realizado_por = models.ForeignKey(Trabajador, on_delete=models.SET_NULL, null=True, related_name="mantenimientos")
+
+    def __str__(self):
+        return f"Mantenimiento {self.maquinaria.nombre_maquinaria} el {self.fecha_mantenimiento}"
+
+# Trabajo con maquinaria
+class TrabajoMaquinaria(models.Model):
+    maquinaria = models.ForeignKey(Maquinaria, on_delete=models.CASCADE)
+    trabajador = models.ForeignKey(Trabajador, on_delete=models.CASCADE)
+    fecha_inicio = models.DateTimeField()
+    fecha_fin = models.DateTimeField()
+    horas_trabajadas = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    descripcion = models.TextField()
+
+    def save(self, *args, **kwargs):
+        if self.fecha_inicio and self.fecha_fin:
+            duracion = self.fecha_fin - self.fecha_inicio
+            self.horas_trabajadas = round(duracion.total_seconds() / 3600, 2)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.trabajador} - {self.maquinaria} ({self.fecha_inicio} a {self.fecha_fin})"
+

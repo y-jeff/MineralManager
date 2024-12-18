@@ -24,7 +24,7 @@
                             <a class="nav-item nav-link" href="/pañol">Pañol</a>
                             <a class="nav-item nav-link" href="/bodega">Bodega</a>
                             <a class="nav-item nav-link active" href="/retiro">Retiro de Artículo</a>
-                            <a class="nav-item nav-link" href="/articulobodega">Bodega a Artículo</a>
+                            <a class="nav-item nav-link" href="/articulobodega">Bodega a Pañol</a>
                             <a class="nav-item nav-link" href="/upload">Subir Archivo</a>
                         </div>
                     </div>
@@ -65,9 +65,9 @@
     </form>
     
     <!-- Historial de retiros -->
-    <h2 class="mb-3">Historial de Retiros</h2>
+    <h2 class="mb-3">Detalle de Retiros y Devoluciones</h2>
     <div class="table-responsive">
-        <table  class="table table-bordered table-striped">
+        <table class="table table-bordered">
             <thead class="table-dark">
                 <tr>
                     <th>ID</th>
@@ -77,26 +77,40 @@
                     <th>Pañol</th>
                     <th>Cantidad</th>
                     <th>Fecha de Retiro</th>
+                    <th>Fecha de Devolución</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
             <tbody>
                 {% for retiro in retiros %}
                 <tr>
-                    <td>{{ retiro.id  }}</td>
+                    <td>{{ retiro.id }}</td>
                     <td>{{ retiro.trabajador.nombre_trabajador }}</td>
                     <td>{{ retiro.trabajador.rut }}</td>
-                    <td>{{ retiro.articulo }}</td>
+                    <td>{{ retiro.articulo.nombre_articulo }}</td>
                     <td>{{ retiro.articulo.panol }}</td>
                     <td>{{ retiro.cantidad }}</td>
                     <td>{{ retiro.fecha_retiro }}</td>
+                    <td>{{ retiro.fecha_devuelta|default:"-" }}</td>
+                    <td>
+                        {% if not retiro.es_devuelto %}
+                            <form method="post" action="{% url 'devolver_articulo' retiro.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-warning btn-sm">Devolver</button>
+                            </form>
+                        {% else %}
+                            Devuelto
+                        {% endif %}
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center">No se han registrado retiros aún.</td>
+                    <td colspan="9" class="text-center">No se han registrado retiros aún.</td>
                 </tr>
                 {% endfor %}
             </tbody>
-        </table>        
+        </table>
+                
     </div>
     <script>
         document.addEventListener("DOMContentLoaded", () => {

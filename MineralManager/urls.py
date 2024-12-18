@@ -70,12 +70,24 @@ urlpatterns = [
     path('api/articulos/<int:bodega_id>/', views.obtener_articulos_por_bodega, name='obtener_articulos_por_bodega'),
 
     #vista maquinaria
-    path('maquinaria/', views.maquinaria_view, name='maquinaria'),
-    path('maquinaria/add/', views.add_maquinaria, name='add_maquinaria'),
-    path('maquinaria/edit/<int:maquinaria_id>/', views.edit_maquinaria, name='edit_maquinaria'),
-    path('maquinaria/delete/<int:maquinaria_id>/', views.delete_maquinaria, name='delete_maquinaria'),
+    # Rutas para obtener mantenimientos y trabajos
+    path('maquinaria/mantenimientos/<int:maquinaria_id>/', views.ver_mantenimientos, name='ver_mantenimientos'),
+    path('maquinaria/trabajos/<int:maquinaria_id>/', views.ver_trabajos, name='ver_trabajos'),
 
+    # Rutas para agregar mantenimiento y trabajo
+    path('maquinaria/agregar-mantenimiento/', views.add_mantenimiento, name='add_mantenimiento'),
+    path('maquinaria/agregar-trabajo/', views.add_trabajo_maquinaria, name='add_trabajo_maquinaria'),
+    
+    # Rutas de visualización de maquinaria
+    path('maquinaria/', views.maquinaria_view, name='maquinaria'),
+
+    # Ruta para desactivar maquinaria
+    path('maquinaria/desactivar/<int:maquinaria_id>/', views.desactivar_maquinaria, name='desactivar_maquinaria'),
+
+   # Ruta para edicion de maquinaria
+    path('maquinaria/editar/<int:maquinaria_id>/', views.edit_maquinaria, name='edit_maquinaria'),
+    
     #vista retiro
     path('retiro/', views.retiro_articulo_view, name='retiro_articulo'),
-
+    path('devolver/<int:retiro_id>/', views.devolver_articulo, name='devolver_articulo'),
 ]
